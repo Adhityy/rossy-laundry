@@ -142,14 +142,16 @@ export default function TrackingPage() {
   }
 
   if (!order || "error" in order) {
+    const serverError = order && "error" in order ? order.error : "";
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6">
         <span className="mx-auto grid size-11 place-items-center rounded-md bg-accent text-muted-foreground">
           <Info size={20} strokeWidth={1.75} />
         </span>
-        <h1 className="mt-5 text-lg font-semibold">Pesanan tidak ditemukan</h1>
-        <p className="mx-auto mt-2 max-w-[40ch] text-sm text-muted-foreground">
-          Pesanan mungkin sudah dihapus, atau nomor yang Anda masukkan tidak cocok.
+        <h1 className="mt-5 text-lg font-semibold">Pesanan tidak bisa dibuka</h1>
+        <p className="mx-auto mt-2 max-w-[46ch] text-sm text-muted-foreground">
+          {serverError ||
+            "Nomor WhatsApp tidak ikut terbawa. Cari ulang di halaman Cek pesanan."}
         </p>
         <Button asChild variant="outline" className="mt-6">
           <Link href="/orders">Cari lagi</Link>

@@ -45,7 +45,10 @@ export async function GET(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   }
   if (res.kind === "forbidden") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Nomor WhatsApp tidak cocok dengan pesanan ini. Cari ulang lewat /orders." },
+      { status: 403 }
+    );
   }
 
   const o = res.order;

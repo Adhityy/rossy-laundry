@@ -136,7 +136,7 @@ export default function OrdersPage() {
 
               <div className="flex justify-end">
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/orders/${o.id}`}>
+                  <Link href={`/orders/${o.id}?phone=${encodeURIComponent(o.whatsapp)}`}>
                     Lihat detail <ArrowRight size={15} strokeWidth={2} />
                   </Link>
                 </Button>
