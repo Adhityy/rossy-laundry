@@ -206,37 +206,61 @@ export default function ExpensesPage() {
                   ))}
                 </div>
               ) : (
-                <Table>
-                  <TableCaption>
-                    {expenses.length === 0
-                      ? "Belum ada pengeluaran tercatat."
-                      : `Total ${expenses.length} catatan.`}
-                  </TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Deskripsi</TableHead>
-                      <TableHead>Kategori</TableHead>
-                      <TableHead className="text-right">Jumlah</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Mobile: kartu bertumpuk */}
+                  <ul className="space-y-3 px-6 pb-6 md:hidden">
                     {expenses.map((e) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(e.date)}
-                        </TableCell>
-                        <TableCell>{e.description}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {categoryLabel(e.category)}
-                        </TableCell>
-                        <TableCell className="tabular text-right font-medium">
-                          {formatCurrency(e.amount)}
-                        </TableCell>
-                      </TableRow>
+                      <li key={e.id} className="rounded-lg border border-border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium">{e.description}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              {formatDate(e.date)} · {categoryLabel(e.category)}
+                            </div>
+                          </div>
+                          <span className="tabular shrink-0 text-sm font-semibold">
+                            {formatCurrency(e.amount)}
+                          </span>
+                        </div>
+                      </li>
                     ))}
-                  </TableBody>
-                </Table>
+                  </ul>
+
+                  {/* Desktop: tabel */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table>
+                      <TableCaption>
+                        {expenses.length === 0
+                          ? "Belum ada pengeluaran tercatat."
+                          : `Total ${expenses.length} catatan.`}
+                      </TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tanggal</TableHead>
+                          <TableHead>Deskripsi</TableHead>
+                          <TableHead>Kategori</TableHead>
+                          <TableHead className="text-right">Jumlah</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenses.map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(e.date)}
+                            </TableCell>
+                            <TableCell>{e.description}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {categoryLabel(e.category)}
+                            </TableCell>
+                            <TableCell className="tabular text-right font-medium">
+                              {formatCurrency(e.amount)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

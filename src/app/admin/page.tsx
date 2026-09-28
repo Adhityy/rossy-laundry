@@ -120,70 +120,139 @@ export default function AdminDashboard() {
               ))}
             </div>
           ) : (
-            <Table>
-              <TableCaption>
-                {orders.length === 0
-                  ? "Belum ada pesanan masuk."
-                  : `Total ${orders.length} pesanan.`}
-              </TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>No. order</TableHead>
-                  <TableHead>Pelanggan</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((o) => (
-                  <TableRow key={o.id}>
-                    <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
-                    <TableCell>
-                      <div>{o.user?.name || "-"}</div>
+            <>
+              {/* Mobile: kartu bertumpuk supaya tidak perlu digeser horizontal */}
+              <div className="md:hidden">
+                {orders.length > 0 && (
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Total {orders.length} pesanan.
+                  </p>
+                )}
+                <ul className="space-y-3">
+                  {orders.map((o) => (
+                    <li key={o.id} className="rounded-lg border border-border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="tabular text-xs text-muted-foreground">
+                          {o.orderNumber}
+                        </span>
+                        <span className="tabular text-sm font-semibold">
+                          {formatCurrency(o.total)}
+                        </span>
+                      </div>
+
+                      <div className="mt-1.5 font-medium">{o.user?.name || "-"}</div>
                       {o.pickupAddress && (
-                        <div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground">
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
                           Jemput: {o.pickupAddress}
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDateTime(o.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={o.status}
-                        onValueChange={(v) => changeStatus(o.id, v)}
-                        disabled={savingId === o.id}
-                      >
-                        <SelectTrigger className="h-8 w-[150px] text-xs" aria-label="Ubah status">
-                          <SelectValue placeholder={statusLabel(o.status)} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ORDER_STATUSES.map((s) => (
-                            <SelectItem key={s.key} value={s.key}>
-                              {s.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="tabular text-right font-medium">
-                      {formatCurrency(o.total)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/orders/${o.id}`}
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Detail
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {formatDateTime(o.createdAt)}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <Select
+                          value={o.status}
+                          onValueChange={(v) => changeStatus(o.id, v)}
+                          disabled={savingId === o.id}
+                        >
+                          <SelectTrigger
+                            className="h-9 w-[150px] text-xs"
+                            aria-label="Ubah status"
+                          >
+                            <SelectValue placeholder={statusLabel(o.status)} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORDER_STATUSES.map((s) => (
+                              <SelectItem key={s.key} value={s.key}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Link
+                          href={`/orders/${o.id}`}
+                          className="shrink-0 text-sm text-primary hover:underline"
+                        >
+                          Detail
+                        </Link>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Desktop: tabel */}
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableCaption>
+                    {orders.length === 0
+                      ? "Belum ada pesanan masuk."
+                      : `Total ${orders.length} pesanan.`}
+                  </TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. order</TableHead>
+                      <TableHead>Pelanggan</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((o) => (
+                      <TableRow key={o.id}>
+                        <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
+                        <TableCell>
+                          <div>{o.user?.name || "-"}</div>
+                          {o.pickupAddress && (
+                            <div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground">
+                              Jemput: {o.pickupAddress}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDateTime(o.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={o.status}
+                            onValueChange={(v) => changeStatus(o.id, v)}
+                            disabled={savingId === o.id}
+                          >
+                            <SelectTrigger
+                              className="h-8 w-[150px] text-xs"
+                              aria-label="Ubah status"
+                            >
+                              <SelectValue placeholder={statusLabel(o.status)} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ORDER_STATUSES.map((s) => (
+                                <SelectItem key={s.key} value={s.key}>
+                                  {s.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="tabular text-right font-medium">
+                          {formatCurrency(o.total)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link
+                            href={`/orders/${o.id}`}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Detail
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

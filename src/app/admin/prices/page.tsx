@@ -32,9 +32,13 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "RUMAH_TANGGA", label: CATEGORY_LABELS.RUMAH_TANGGA },
 ];
 
-const inputCls =
-  "tabular h-9 w-28 rounded-md border border-input bg-transparent px-2.5 text-right text-sm " +
+const inputBase =
+  "tabular h-9 rounded-md border border-input bg-transparent px-2.5 text-right text-sm " +
   "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50";
+
+/** Lebar tetap untuk kolom tabel, lebar penuh untuk kartu mobile. */
+const inputCls = `${inputBase} w-28`;
+const inputMobileCls = `${inputBase} w-full`;
 
 function toInput(v: number | null): string {
   return v === null ? "" : String(v);
@@ -256,7 +260,85 @@ export default function AdminPricesPage() {
           const rows = items.filter((i) => i.category === c.value);
           return (
             <TabsContent key={c.value} value={c.value} className="mt-4">
-              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              {/* Mobile: kartu bertumpuk, input selebar layar */}
+              <ul className="space-y-3 md:hidden">
+                {rows.map((item) => (
+                  <li
+                    key={item.id}
+                    className={
+                      "rounded-lg border border-border p-4 " + (item.active ? "" : "opacity-60")
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">{item.name}</div>
+                        {item.note && (
+                          <div className="mt-0.5 text-xs text-muted-foreground">{item.note}</div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Hapus ${item.name}`}
+                        onClick={() => remove(item)}
+                        className="shrink-0"
+                      >
+                        <Trash2 size={15} strokeWidth={1.75} />
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 space-y-2.5">
+                      <div className="flex items-center gap-3">
+                        <label
+                          htmlFor={`m-l-${item.id}`}
+                          className="w-24 shrink-0 text-sm text-muted-foreground"
+                        >
+                          Laundry
+                        </label>
+                        <Input
+                          id={`m-l-${item.id}`}
+                          inputMode="numeric"
+                          className={inputMobileCls}
+                          value={toInput(item.laundryPrice)}
+                          onChange={(e) => setPrice(item.id, "laundryPrice", e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label
+                          htmlFor={`m-d-${item.id}`}
+                          className="w-24 shrink-0 text-sm text-muted-foreground"
+                        >
+                          Dry clean
+                        </label>
+                        <Input
+                          id={`m-d-${item.id}`}
+                          inputMode="numeric"
+                          className={inputMobileCls}
+                          value={toInput(item.dryCleanPrice)}
+                          onChange={(e) => setPrice(item.id, "dryCleanPrice", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                      <span className="text-sm text-muted-foreground">Ditampilkan</span>
+                      <Switch
+                        checked={item.active}
+                        aria-label={`Tampilkan ${item.name}`}
+                        onCheckedChange={(v) =>
+                          setItems((prev) =>
+                            prev.map((i) => (i.id === item.id ? { ...i, active: v } : i))
+                          )
+                        }
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Desktop: tabel */}
+              <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>

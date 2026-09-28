@@ -196,37 +196,64 @@ export default function ReportsPage() {
           <CardTitle className="text-base">Tabel transaksi</CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <Table>
-            <TableCaption>
+          {/* Mobile: kartu bertumpuk */}
+          <div className="px-4 pb-6 md:hidden">
+            <p className="mb-3 text-sm text-muted-foreground">
               {orders.length === 0 ? "Belum ada transaksi." : `Total ${orders.length} pesanan.`}
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>No. order</TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>Pelanggan</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+            </p>
+            <ul className="space-y-3">
               {orders.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(o.createdAt)}
-                  </TableCell>
-                  <TableCell>{o.user?.name || "-"}</TableCell>
-                  <TableCell>
+                <li key={o.id} className="rounded-lg border border-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="tabular text-xs text-muted-foreground">{o.orderNumber}</span>
+                    <span className="tabular text-sm font-semibold">{formatCurrency(o.total)}</span>
+                  </div>
+                  <div className="mt-1.5 font-medium">{o.user?.name || "-"}</div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      {formatDateTime(o.createdAt)}
+                    </span>
                     <StatusBadge status={o.status} />
-                  </TableCell>
-                  <TableCell className="tabular text-right font-medium">
-                    {formatCurrency(o.total)}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                </li>
               ))}
-            </TableBody>
-          </Table>
+            </ul>
+          </div>
+
+          {/* Desktop: tabel */}
+          <div className="hidden overflow-x-auto md:block">
+            <Table>
+              <TableCaption>
+                {orders.length === 0 ? "Belum ada transaksi." : `Total ${orders.length} pesanan.`}
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>No. order</TableHead>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Pelanggan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDateTime(o.createdAt)}
+                    </TableCell>
+                    <TableCell>{o.user?.name || "-"}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={o.status} />
+                    </TableCell>
+                    <TableCell className="tabular text-right font-medium">
+                      {formatCurrency(o.total)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
