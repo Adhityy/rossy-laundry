@@ -17,6 +17,7 @@ export type Order = {
   id: string;
   orderNumber: string;
   service: string; // KILOAN | SATUAN
+  washType: "LAUNDRY" | "DRY_CLEAN";
   status: string; // see ORDER_STATUSES
   deliveryType: "PICKUP" | "DELIVERY";
   deliveryFee: number;
@@ -29,6 +30,15 @@ export type Order = {
   updatedAt: string;
   statusLogs?: OrderStatusLog[];
   user?: { name: string; email: string; phone: string | null };
+};
+
+export type PriceItem = {
+  id: string;
+  category: string; // PAKAIAN | RUMAH_TANGGA
+  name: string;
+  laundryPrice: number | null;
+  dryCleanPrice: number | null;
+  note: string | null;
 };
 
 export type Expense = {

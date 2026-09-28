@@ -136,6 +136,12 @@ export default function TrackingPage() {
             {formatDateTime(order.createdAt)}
             <span className="mx-1.5">·</span>
             {order.service === "KILOAN" ? "Kiloan" : "Satuan"}
+            {order.service !== "KILOAN" && (
+              <>
+                <span className="mx-1.5">·</span>
+                {order.washType === "DRY_CLEAN" ? "Dry clean" : "Laundry"}
+              </>
+            )}
             <span className="mx-1.5">·</span>
             {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
           </p>

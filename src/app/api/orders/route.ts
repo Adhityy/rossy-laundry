@@ -6,6 +6,7 @@ import { z } from "zod";
 
 const orderSchema = z.object({
   service: z.enum(["KILOAN", "SATUAN"]),
+  washType: z.enum(["LAUNDRY", "DRY_CLEAN"]).default("LAUNDRY"),
   items: z.array(z.object({
     name: z.string(),
     qty: z.number().min(1),
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
         orderNumber: generateOrderNumber(),
         userId: (session.user as any).id,
         service: data.service,
+        washType: data.washType,
         items: JSON.stringify(data.items),
         weight: data.weight,
         total: total + data.deliveryFee,

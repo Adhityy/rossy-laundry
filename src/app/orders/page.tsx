@@ -112,9 +112,14 @@ export default function OrdersPage() {
                       </p>
                       <p className="text-sm">
                         {order.service === "KILOAN" ? "Kiloan" : "Satuan"}
+                        {order.service !== "KILOAN" && (
+                          <span className="text-muted-foreground">
+                            {" · "}
+                            {order.washType === "DRY_CLEAN" ? "Dry clean" : "Laundry"}
+                          </span>
+                        )}
                         <span className="text-muted-foreground">
-                          {" "}
-                          ·{" "}
+                          {" · "}
                           {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
                         </span>
                       </p>

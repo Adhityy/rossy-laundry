@@ -1,116 +1,137 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PRICE_GROUPS, PRICES_KILOAN, LAUNDRY_INFO, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { LAUNDRY_INFO, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
 import { formatCurrency } from "@/lib/utils";
+import type { PriceItem } from "@/lib/types";
 
-// Cuci regular berlaku sama untuk semua jenis; dry clean punya pengecualian.
-const laundryPrice = PRICES_KILOAN[0]?.laundry ?? 7000;
-const dryCleanCounts = PRICES_KILOAN.reduce<Record<number, number>>((acc, p) => {
-  acc[p.dryClean] = (acc[p.dryClean] ?? 0) + 1;
-  return acc;
-}, {});
-const baseDryClean =
-  Number(
-    Object.entries(dryCleanCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 10000
-  ) || 10000;
-const dryCleanExceptions = PRICES_KILOAN.filter((p) => p.dryClean !== baseDryClean);
+const CATEGORY_LABELS: Record<string, string> = {
+  PAKAIAN: "Pakaian",
+  RUMAH_TANGGA: "Rumah tangga",
+};
 
-function PriceRow({ name, price }: { name: string; price: number | null }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <span className="text-sm text-muted-foreground">{name}</span>
-      {price === null ? (
-        <span className="text-sm text-muted-foreground/70">Hubungi kami</span>
-      ) : (
-        <span className="tabular text-sm font-medium">{formatCurrency(price)}</span>
-      )}
-    </div>
-  );
+function Price({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-muted-foreground/60">Hubungi</span>;
+  return <span className="tabular">{formatCurrency(value)}</span>;
 }
 
 export function PriceTable() {
-  const [tab, setTab] = useState("kiloan");
+  const [prices, setPrices] = useState<PriceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/prices")
+      .then((r) => r.json())
+      .then((d: unknown) => {
+        if (!alive) return;
+        setPrices(Array.isArray(d) ? (d as PriceItem[]) : []);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, PriceItem[]>();
+    for (const p of prices) {
+      const arr = map.get(p.category) ?? [];
+      arr.push(p);
+      map.set(p.category, arr);
+    }
+    return [...map.entries()];
+  }, [prices]);
+
+  const firstCategory = grouped[0]?.[0] ?? "PAKAIAN";
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-28">
       <div className="max-w-[62ch]">
         <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daftar harga</h2>
         <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-          Harga terbuka, tanpa biaya tersembunyi. Berlaku sepanjang tahun.
+          Tarif per potong, berlaku sama dengan struk cetak di outlet. Harga terbuka, tanpa
+          biaya tersembunyi.
         </p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="mt-8">
-        <TabsList>
-          <TabsTrigger value="kiloan">Kiloan</TabsTrigger>
-          <TabsTrigger value="satuan">Satuan</TabsTrigger>
-        </TabsList>
+      <div className="mt-8 grid gap-4 lg:grid-cols-12">
+        <div className="rounded-xl border border-border bg-card p-6 lg:col-span-5">
+          <p className="text-sm font-medium text-muted-foreground">Cuci kiloan</p>
+          <p className="tabular mt-3 text-4xl font-semibold tracking-tight">
+            {formatCurrency(LAUNDRY_INFO.kiloanRate)}
+            <span className="ml-2 text-lg font-normal text-muted-foreground">/ kg</span>
+          </p>
+          <p className="mt-4 max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
+            Minimum {MIN_ORDER_KG} kg per order. Diskon 10% untuk order di atas 10 kg.
+          </p>
+        </div>
 
-        <TabsContent value="kiloan" className="mt-6">
-          <div className="grid gap-4 lg:grid-cols-12">
-            <div className="rounded-xl border border-border bg-card p-6 lg:col-span-5">
-              <p className="text-sm font-medium text-muted-foreground">Cuci regular</p>
-              <p className="tabular mt-3 text-4xl font-semibold tracking-tight">
-                {formatCurrency(laundryPrice)}
-                <span className="ml-2 text-lg font-normal text-muted-foreground">/ kg</span>
-              </p>
-              <p className="mt-4 max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
-                Berlaku untuk seluruh jenis pakaian di daftar kiloan. Tidak ada harga
-                per-kategori.
-              </p>
+        <div className="lg:col-span-7">
+          {loading ? (
+            <div className="space-y-2 rounded-xl border border-border bg-card p-6">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-2/3" />
             </div>
+          ) : (
+            <Tabs defaultValue={firstCategory}>
+              <TabsList>
+                {grouped.map(([category, items]) => (
+                  <TabsTrigger key={category} value={category}>
+                    {CATEGORY_LABELS[category] ?? category}
+                    <span className="tabular ml-1.5 text-muted-foreground">{items.length}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-            <div className="rounded-xl border border-border bg-card p-6 lg:col-span-7">
-              <p className="text-sm font-medium text-muted-foreground">Dry clean</p>
-              <p className="tabular mt-3 text-4xl font-semibold tracking-tight">
-                {formatCurrency(baseDryClean)}
-                <span className="ml-2 text-lg font-normal text-muted-foreground">/ kg</span>
-              </p>
-
-              {dryCleanExceptions.length > 0 && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Pengecualian
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {dryCleanExceptions.map((p) => (
-                      <li key={p.name} className="flex items-baseline justify-between gap-4">
-                        <span className="text-sm">{p.name}</span>
-                        <span className="tabular text-sm font-medium">
-                          {formatCurrency(p.dryClean)} <span className="font-normal text-muted-foreground">/ kg</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="satuan" className="mt-6">
-          <div className="grid gap-x-10 gap-y-8 md:grid-cols-2">
-            {PRICE_GROUPS.map((group) => (
-              <div key={group.label} className="border-t border-border pt-6">
-                <h3 className="text-base font-semibold">
-                  {group.label}{" "}
-                  <span className="tabular ml-1 text-sm font-normal text-muted-foreground">
-                    {group.items.length} item
-                  </span>
-                </h3>
-                <div className="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.items.map((item) => (
-                    <PriceRow key={item.name} name={item.name} price={item.price} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+              {grouped.map(([category, items]) => (
+                <TabsContent key={category} value={category} className="mt-4">
+                  <div className="max-h-[420px] overflow-y-auto rounded-xl border border-border bg-card">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Jenis</TableHead>
+                          <TableHead className="text-right">Laundry</TableHead>
+                          <TableHead className="text-right">Dry clean</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item) => (
+                          <TableRow key={item.id} title={item.note ?? undefined}>
+                            <TableCell className="text-sm">{item.name}</TableCell>
+                            <TableCell className="text-right text-sm">
+                              <Price value={item.laundryPrice} />
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              <Price value={item.dryCleanPrice} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </div>
+      </div>
 
       <Alert className="mt-8">
         <Info size={16} />

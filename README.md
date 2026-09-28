@@ -5,7 +5,9 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 ## Fitur
 
 1. **Login & registrasi** — autentikasi pelanggan dan admin (NextAuth v5, credentials + JWT)
-2. **Buat pesanan** — kiloan (per kg) atau satuan (per potong), pilihan antar ke toko / antar jemput
+2. **Buat pesanan** — kiloan (per kg) atau satuan (per potong). Tarif per potong diambil
+   dari database (`PriceItem`), pelanggan pilih jenis cucian Laundry / Dry Clean dan
+   totalnya dihitung otomatis
 3. **Tracking status** — stepper 7 tahap dengan riwayat status, polling tiap 5 detik
 4. **Riwayat transaksi** — daftar pesanan pelanggan dan total pengeluaran
 5. **Notifikasi WhatsApp** — tombol kontak langsung ke WhatsApp (integrasi kirim otomatis belum ada)
@@ -83,6 +85,14 @@ src/
 
 - `POST /api/orders` menyimpan `items` sebagai string JSON, karena itu yang dibaca UI.
 - Ongkos antar jemput: **Rp 0 (gratis)**, diatur lewat `DELIVERY_FEE` di `src/lib/data.ts`.
+- **Tarif per potong** ada di tabel `PriceItem` (60 baris), diketik ulang dari struk cetak
+  Rossy. Sumber: `prisma/prices.ts`, masuk lewat `npm run db:seed`, dibaca lewat
+  `GET /api/prices`. Empat sel tarif memang kosong di struk (Karpet Tebal/Tipis, Kasur
+  Lantai Kecil/Besar) sehingga disimpan `null` dan tampil "Hubungi kami" — tidak bisa
+  dipesan online.
+- **Tarif kiloan per kg tidak ada di struk.** Nilai `LAUNDRY_INFO.kiloanRate` di
+  `src/lib/data.ts` masih angka lama (Rp 7.000/kg) — sesuaikan kalau beda.
 - Alamat jemput/antar belum ada di schema maupun form. Opsi antar jemput hanya memilih
   cara pengangkutan, penjemputan diatur lewat WhatsApp.
+- Belum ada halaman ubah password. Akun admin diubah lewat database atau tambah sendiri.
 - Foto di `public/` dari Wikimedia Commons (lihat kredit di footer).

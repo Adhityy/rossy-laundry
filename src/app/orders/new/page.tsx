@@ -1,37 +1,50 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Package, FileText, Bike, Truck, Minus, Plus, Send } from "lucide-react";
+import { Package, FileText, Bike, Truck, Minus, Plus, Send, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PRICES_KILOAN, PRICES_SATUAN, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DELIVERY_FEE, MIN_ORDER_KG, LAUNDRY_INFO } from "@/lib/data";
 import { formatCurrency } from "@/lib/utils";
+import type { PriceItem } from "@/lib/types";
 
 type Service = "kiloan" | "satuan";
 type Delivery = "PICKUP" | "DELIVERY";
-type SelectedItem = { name: string; qty: number; price: number };
+type WashType = "LAUNDRY" | "DRY_CLEAN";
 
-const laundryPrice = PRICES_KILOAN[0]?.laundry ?? 7000;
-const selectableItems = PRICES_SATUAN.filter((p) => p.price !== null);
+const CATEGORY_LABELS: Record<string, string> = {
+  PAKAIAN: "Pakaian",
+  RUMAH_TANGGA: "Rumah tangga",
+};
 
 const optionCard =
   "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors " +
   "has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50";
+
+function priceOf(item: PriceItem, wash: WashType): number | null {
+  return wash === "LAUNDRY" ? item.laundryPrice : item.dryCleanPrice;
+}
 
 export default function NewOrderPage() {
   const router = useRouter();
   const { status } = useSession();
 
   const [service, setService] = useState<Service>("kiloan");
+  const [washType, setWashType] = useState<WashType>("LAUNDRY");
   const [delivery, setDelivery] = useState<Delivery>("PICKUP");
   const [weight, setWeight] = useState(MIN_ORDER_KG);
-  const [selected, setSelected] = useState<SelectedItem[]>([]);
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
   const [notes, setNotes] = useState("");
+  const [prices, setPrices] = useState<PriceItem[]>([]);
+  const [pricesLoading, setPricesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,25 +52,67 @@ export default function NewOrderPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/prices")
+      .then((r) => r.json())
+      .then((d: unknown) => {
+        if (!alive) return;
+        setPrices(Array.isArray(d) ? (d as PriceItem[]) : []);
+        setPricesLoading(false);
+      })
+      .catch(() => {
+        if (alive) setPricesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Tarif kiloan tidak ada di struk; dipakai tarif tetap per kg.
+  const kiloanRate = LAUNDRY_INFO.kiloanRate;
+
+  const selected = useMemo(
+    () => prices.filter((p) => (qty[p.id] ?? 0) > 0),
+    [prices, qty]
+  );
+
   const subtotal =
     service === "kiloan"
-      ? laundryPrice * weight
-      : selected.reduce((sum, item) => sum + item.price * item.qty, 0);
+      ? kiloanRate * weight
+      : selected.reduce((sum, p) => {
+          const unit = priceOf(p, washType);
+          return unit === null ? sum : sum + unit * (qty[p.id] ?? 0);
+        }, 0);
+
   const deliveryFee = delivery === "DELIVERY" ? DELIVERY_FEE : 0;
   const total = subtotal + deliveryFee;
 
-  function toggleItem(name: string, price: number) {
-    setSelected((prev) =>
-      prev.some((i) => i.name === name)
-        ? prev.filter((i) => i.name !== name)
-        : [...prev, { name, qty: 1, price }]
-    );
-  }
+  const itemCount = selected.reduce((n, p) => n + (qty[p.id] ?? 0), 0);
 
-  function updateQty(name: string, delta: number) {
-    setSelected((prev) =>
-      prev.map((i) => (i.name === name ? { ...i, qty: Math.max(1, i.qty + delta) } : i))
-    );
+  const visiblePrices = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return prices.filter((p) => (q ? p.name.toLowerCase().includes(q) : true));
+  }, [prices, query]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, PriceItem[]>();
+    for (const p of visiblePrices) {
+      const arr = map.get(p.category) ?? [];
+      arr.push(p);
+      map.set(p.category, arr);
+    }
+    return [...map.entries()];
+  }, [visiblePrices]);
+
+  function bump(id: string, delta: number) {
+    setQty((prev) => {
+      const next = Math.max(0, (prev[id] ?? 0) + delta);
+      const copy = { ...prev };
+      if (next === 0) delete copy[id];
+      else copy[id] = next;
+      return copy;
+    });
   }
 
   async function handleSubmit() {
@@ -67,23 +122,32 @@ export default function NewOrderPage() {
       setError(`Minimal order ${MIN_ORDER_KG} kg.`);
       return;
     }
-    if (service === "satuan" && selected.length === 0) {
-      setError("Pilih minimal satu item.");
-      return;
+
+    if (service === "satuan") {
+      const items = selected
+        .map((p) => ({ name: p.name, qty: qty[p.id] ?? 0, price: priceOf(p, washType) ?? 0 }))
+        .filter((i) => i.qty > 0);
+      if (items.length === 0) {
+        setError("Pilih minimal satu item.");
+        return;
+      }
     }
 
     setLoading(true);
     try {
       const items =
         service === "kiloan"
-          ? [{ name: "Laundry kiloan", qty: weight, price: laundryPrice }]
-          : selected;
+          ? [{ name: "Laundry kiloan", qty: weight, price: kiloanRate }]
+          : selected
+              .map((p) => ({ name: p.name, qty: qty[p.id] ?? 0, price: priceOf(p, washType) ?? 0 }))
+              .filter((i) => i.qty > 0);
 
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service: service.toUpperCase(),
+          washType,
           items,
           weight: service === "kiloan" ? weight : undefined,
           deliveryType: delivery,
@@ -105,12 +169,12 @@ export default function NewOrderPage() {
     }
   }
 
-  if (status === "loading") {
+  if (status === "loading" || pricesLoading) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 px-4 py-12 sm:px-6">
-        <div className="h-8 w-56 animate-pulse rounded-md bg-muted" />
-        <div className="h-40 w-full animate-pulse rounded-xl bg-muted" />
-        <div className="h-64 w-full animate-pulse rounded-xl bg-muted" />
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <Skeleton className="h-72 w-full rounded-xl" />
       </div>
     );
   }
@@ -119,9 +183,9 @@ export default function NewOrderPage() {
     <div className="mx-auto max-w-3xl space-y-5 px-4 py-12 sm:px-6">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Buat pesanan</h1>
-        <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">
-          Pilih jenis layanan, isi detail cucian, lalu kirim. Statusnya bisa dipantau di
-          halaman riwayat.
+        <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-muted-foreground">
+          Tarif diambil langsung dari daftar resmi Rossy. Isi item yang dicuci, totalnya
+          dihitung otomatis.
         </p>
       </header>
 
@@ -141,8 +205,8 @@ export default function NewOrderPage() {
                 <span className="flex items-center gap-2 font-medium">
                   <Package size={16} strokeWidth={1.75} /> Kiloan
                 </span>
-                <span className="mt-1 block text-sm text-muted-foreground">
-                  Dihitung per kilogram, {formatCurrency(laundryPrice)}/kg
+                <span className="tabular mt-1 block text-sm text-muted-foreground">
+                  {formatCurrency(kiloanRate)}/kg, min {MIN_ORDER_KG} kg
                 </span>
               </span>
             </label>
@@ -154,7 +218,7 @@ export default function NewOrderPage() {
                   <FileText size={16} strokeWidth={1.75} /> Satuan
                 </span>
                 <span className="mt-1 block text-sm text-muted-foreground">
-                  Dihitung per potong
+                  Per potong, pilih dari daftar tarif
                 </span>
               </span>
             </label>
@@ -200,75 +264,155 @@ export default function NewOrderPage() {
                 </Button>
                 <span className="text-sm text-muted-foreground">kg</span>
               </div>
-
-              <p className="text-sm text-muted-foreground">
-                Minimum {MIN_ORDER_KG} kg
-                {weight > 10 && <span className="text-primary"> · diskon 10% berlaku</span>}
-              </p>
+              <p className="text-sm text-muted-foreground">Minimum {MIN_ORDER_KG} kg</p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader className="space-y-0 pb-3">
-            <CardTitle className="text-base">Pilih item</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {selectableItems.map((item) => {
-                const sel = selected.find((i) => i.name === item.name);
-                return (
-                  <div
-                    key={item.name}
-                    className={[
-                      "rounded-lg border transition-colors",
-                      sel ? "border-primary bg-primary/5" : "border-border bg-card",
-                    ].join(" ")}
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={Boolean(sel)}
-                      onClick={() => toggleItem(item.name, item.price ?? 0)}
-                      className="w-full rounded-lg px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                      <span className="block truncate text-sm font-medium">{item.name}</span>
-                      <span className="tabular mt-0.5 block text-xs text-muted-foreground">
-                        {formatCurrency(item.price ?? 0)}
-                      </span>
-                    </button>
+        <>
+          <Card>
+            <CardHeader className="space-y-0 pb-3">
+              <CardTitle className="text-base">Jenis cucian</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={washType}
+                onValueChange={(v) => setWashType(v as WashType)}
+                className="grid gap-3 sm:grid-cols-2"
+              >
+                <label className={optionCard} htmlFor="wash-laundry">
+                  <RadioGroupItem id="wash-laundry" value="LAUNDRY" className="mt-0.5" />
+                  <span>
+                    <span className="font-medium">Laundry</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Cuci kering, setrika
+                    </span>
+                  </span>
+                </label>
+                <label className={optionCard} htmlFor="wash-dry">
+                  <RadioGroupItem id="wash-dry" value="DRY_CLEAN" className="mt-0.5" />
+                  <span>
+                    <span className="font-medium">Dry clean</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Tanpa air, untuk bahan sensitif
+                    </span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </CardContent>
+          </Card>
 
-                    {sel && (
-                      <div className="flex items-center justify-between border-t border-primary/20 px-2 py-1.5">
-                        <button
-                          type="button"
-                          aria-label={`Kurangi ${item.name}`}
-                          onClick={() => updateQty(item.name, -1)}
-                          className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          <Card>
+            <CardHeader className="space-y-3 pb-3">
+              <CardTitle className="text-base">
+                Pilih item
+                {itemCount > 0 && (
+                  <span className="tabular ml-2 text-sm font-normal text-muted-foreground">
+                    {itemCount} potong
+                  </span>
+                )}
+              </CardTitle>
+              <div className="relative">
+                <Search
+                  size={15}
+                  strokeWidth={1.75}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Cari jenis cucian"
+                  aria-label="Cari jenis cucian"
+                  className="pl-9"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {grouped.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Tidak ada item yang cocok dengan pencarian.
+                </p>
+              )}
+
+              {grouped.map(([category, items]) => (
+                <div key={category} className="border-t border-border pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {CATEGORY_LABELS[category] ?? category}
+                  </h3>
+                  <ul className="mt-3 grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                    {items.map((item) => {
+                      const unit = priceOf(item, washType);
+                      const count = qty[item.id] ?? 0;
+                      const orderable = unit !== null;
+
+                      return (
+                        <li
+                          key={item.id}
+                          className={
+                            "flex items-center justify-between gap-3 rounded-md px-2 py-1.5 " +
+                            (count > 0 ? "bg-primary/5" : "")
+                          }
                         >
-                          <Minus size={14} strokeWidth={2} />
-                        </button>
-                        <span className="tabular text-sm font-semibold">{sel.qty}</span>
-                        <button
-                          type="button"
-                          aria-label={`Tambah ${item.name}`}
-                          onClick={() => updateQty(item.name, 1)}
-                          className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          <Plus size={14} strokeWidth={2} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {selected.length === 0
-                ? "Belum ada item dipilih."
-                : `${selected.length} item dipilih.`}
-            </p>
-          </CardContent>
-        </Card>
+                          <span
+                            className={
+                              "min-w-0 truncate text-sm " +
+                              (orderable ? "" : "text-muted-foreground/70")
+                            }
+                            title={item.note ?? undefined}
+                          >
+                            {item.name}
+                          </span>
+
+                          {orderable ? (
+                            count > 0 ? (
+                              <span className="flex shrink-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  aria-label={`Kurangi ${item.name}`}
+                                  onClick={() => bump(item.id, -1)}
+                                  className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                >
+                                  <Minus size={14} strokeWidth={2} />
+                                </button>
+                                <span className="tabular w-6 text-center text-sm font-semibold">
+                                  {count}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Tambah ${item.name}`}
+                                  onClick={() => bump(item.id, 1)}
+                                  className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                >
+                                  <Plus size={14} strokeWidth={2} />
+                                </button>
+                                <span className="tabular w-24 text-right text-sm font-medium">
+                                  {formatCurrency(unit * count)}
+                                </span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => bump(item.id, 1)}
+                                className="tabular flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                              >
+                                {formatCurrency(unit)}
+                                <Plus size={13} strokeWidth={2} />
+                              </button>
+                            )
+                          ) : (
+                            <span className="shrink-0 text-xs text-muted-foreground/70">
+                              Hubungi kami
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </>
       )}
 
       <Card>
@@ -330,15 +474,23 @@ export default function NewOrderPage() {
         </CardHeader>
         <CardContent className="space-y-2.5">
           <div className="flex items-baseline justify-between gap-4 text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-muted-foreground">
+              {service === "kiloan"
+                ? `Kiloan ${weight} kg × ${formatCurrency(kiloanRate)}`
+                : `${itemCount} potong, ${
+                    washType === "LAUNDRY" ? "laundry" : "dry clean"
+                  }`}
+            </span>
             <span className="tabular">{formatCurrency(subtotal)}</span>
           </div>
+
           <div className="flex items-baseline justify-between gap-4 text-sm">
             <span className="text-muted-foreground">Ongkos antar</span>
             <span className="tabular">
               {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Gratis"}
             </span>
           </div>
+
           <div className="flex items-baseline justify-between gap-4 border-t border-border pt-3">
             <span className="font-medium">Total</span>
             <span className="tabular text-lg font-semibold">{formatCurrency(total)}</span>
