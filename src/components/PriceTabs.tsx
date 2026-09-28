@@ -59,7 +59,13 @@ export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; init
       </TabsList>
 
       {grouped.map(([category, list]) => (
-        <TabsContent key={category} value={category} className="mt-4">
+        // forceMount: semua panel tetap ada di HTML (SEO harga), Radix sembunyikan yang pasif.
+        <TabsContent
+          key={category}
+          value={category}
+          forceMount
+          className="mt-4 data-[state=inactive]:hidden"
+        >
           <div className="max-h-[420px] overflow-y-auto rounded-xl border border-border bg-card">
             <Table>
               <TableHeader>
