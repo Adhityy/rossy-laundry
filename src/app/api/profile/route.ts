@@ -1,25 +1,32 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-// Batas avatar: 160x160 WebP sudah ~10 KB. 120 KB memberi ruang untuk foto bulat besar.
+// Batas avatar: 160x160 WebP sudah ~10 KB. 120 KB memberi ruang untuk foto besar.
 const MAX_AVATAR_BYTES = 120_000;
 
+/** Ubah string kosong jadi null sebelum validasi, supaya kolom benar-benar kosong. */
+const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (v === "" ? null : v), schema);
+
 const updateSchema = z.object({
-  name: z.string().min(2).max(80),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[0-9]{10,15}$/, "Nomor WhatsApp hanya angka, 10-15 digit")
-    .nullable()
-    .or(z.literal("").transform(() => null)),
-  address: z.string().max(200).nullable().or(z.literal("").transform(() => null)),
+  // Semua opsional: field yang tidak dikirim tidak disentuh.
+  name: z.string().min(2, "Nama minimal 2 karakter").max(80).optional(),
+  phone: emptyToNull(
+    z
+      .string()
+      .regex(/^[0-9]{10,15}$/, "Nomor WhatsApp hanya angka, 10-15 digit")
+      .nullable()
+  ).optional(),
+  address: emptyToNull(z.string().max(200, "Alamat maksimal 200 karakter").nullable()).optional(),
+  // null = hapus foto, undefined = tidak diubah.
   avatar: z
     .string()
     .max(MAX_AVATAR_BYTES, "Foto terlalu besar, maksimal 120 KB")
     .nullable()
-    .or(z.literal("").transform(() => null)),
+    .optional(),
 });
 
 export async function GET() {
@@ -66,21 +73,26 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const data = parsed.data;
+  const { name, phone, address, avatar } = parsed.data;
 
-  if (data.avatar && !/^data:image\/(png|jpe?g|webp);base64,/.test(data.avatar)) {
+  if (avatar && !/^data:image\/(png|jpe?g|webp);base64,/.test(avatar)) {
     return NextResponse.json({ error: "Format foto tidak didukung" }, { status: 400 });
+  }
+
+  const data: Prisma.UserUpdateInput = {};
+  if (name !== undefined) data.name = name;
+  if (phone !== undefined) data.phone = phone;
+  if (address !== undefined) data.address = address;
+  if (avatar !== undefined) data.avatar = avatar; // null menghapus foto
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Tidak ada perubahan" }, { status: 400 });
   }
 
   try {
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        name: data.name,
-        phone: data.phone,
-        address: data.address,
-        ...(data.avatar === null ? {} : { avatar: data.avatar }),
-      },
+      data,
       select: {
         id: true,
         name: true,
