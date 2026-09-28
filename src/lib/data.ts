@@ -18,6 +18,11 @@ export const LAUNDRY_INFO = {
 // Daftar tarif per potong ada di database (model PriceItem),
 // diisi dari struk cetak lewat prisma/seed.ts dan dibaca lewat GET /api/prices.
 
+export const CATEGORY_LABELS: Record<string, string> = {
+  PAKAIAN: "Pakaian",
+  RUMAH_TANGGA: "Rumah tangga",
+};
+
 // Urutan status yang dipakai API PATCH /api/orders/[id]/status dan dropdown admin.
 // Warna tidak disimpan di sini: satu aksen (primary) dipakai untuk semua status,
 // tahap dibedakan lewat langkah (step) dan label.

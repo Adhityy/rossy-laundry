@@ -16,6 +16,7 @@ const links = [
 
 const adminLinks = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/prices", label: "Harga" },
   { href: "/admin/reports", label: "Laporan" },
   { href: "/admin/expenses", label: "Pengeluaran" },
 ];

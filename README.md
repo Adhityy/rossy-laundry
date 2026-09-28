@@ -15,6 +15,8 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 7. **Laporan pengeluaran & laba rugi** — input pengeluaran, total, dan laba/rugi
 8. **Profil** — foto profil (di-resize 160×160 di browser), nama, alamat, nomor WhatsApp,
    dan ganti password dengan konfirmasi password sekarang
+9. **Kelola harga (admin)** — edit tarif laundry & dry clean inline, sembunyikan item tanpa
+   menghapus, tambah dan hapus item, satu tombol simpan untuk semua perubahan
 
 ## Stack
 
