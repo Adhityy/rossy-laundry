@@ -14,6 +14,7 @@ const orderSchema = z.object({
   })),
   weight: z.number().optional(),
   deliveryType: z.enum(["PICKUP", "DELIVERY"]),
+  pickupAddress: z.string().max(300).optional().or(z.literal("").transform(() => undefined)),
   deliveryFee: z.number().default(0),
   notes: z.string().optional(),
 });
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
         weight: data.weight,
         total: total + data.deliveryFee,
         deliveryType: data.deliveryType,
+        pickupAddress: data.deliveryType === "DELIVERY" ? data.pickupAddress ?? null : null,
         deliveryFee: data.deliveryFee,
         notes: data.notes,
         statusLogs: { create: { status: "PENDING", note: "Pesanan dibuat" } },

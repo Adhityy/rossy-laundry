@@ -140,7 +140,14 @@ export default function AdminDashboard() {
                 {orders.map((o) => (
                   <TableRow key={o.id}>
                     <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
-                    <TableCell>{o.user?.name || "-"}</TableCell>
+                    <TableCell>
+                      <div>{o.user?.name || "-"}</div>
+                      {o.pickupAddress && (
+                        <div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground">
+                          Jemput: {o.pickupAddress}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDateTime(o.createdAt)}
                     </TableCell>

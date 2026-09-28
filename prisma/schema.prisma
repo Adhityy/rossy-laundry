@@ -34,6 +34,7 @@ model Order {
   washType     String          @default("LAUNDRY") // LAUNDRY | DRY_CLEAN (kolom tarif di struk)
   status       String          @default("PENDING") // see ORDER_STATUSES in lib/data.ts
   deliveryType String // PICKUP | DELIVERY
+  pickupAddress String? // isi pelanggan saat antar jemput, boleh diedit manual
   deliveryFee  Float           @default(0)
   items        String          @default("[]") // JSON: [{ name, qty, price }]
   weight       Float?

@@ -94,8 +94,16 @@ src/
   dipesan online.
 - **Tarif kiloan per kg tidak ada di struk.** Nilai `LAUNDRY_INFO.kiloanRate` di
   `src/lib/data.ts` masih angka lama (Rp 7.000/kg) — sesuaikan kalau beda.
-- Alamat jemput/antar belum ada di schema maupun form. Opsi antar jemput hanya memilih
-  cara pengangkutan, penjemputan diatur lewat WhatsApp.
+- **Alamat penjemputan** ada di kolom `Order.pickupAddress`. Isi lewat tombol "Gunakan
+  lokasi saya" (reverse geocode) atau ketik manual, lalu tetap bisa disunting. Geocoder
+  default: Photon (`photon.komoot.io`, komoot, open source) — gratis tanpa API key,
+  tanpa SLA, akan men-throttle pemakaian berat.
+  - Hasil **search** cukup bagus untuk alamat Tangerang.
+  - Hasil **reverse geocode** kasar (tingkat kelurahan, sering tanpa nomor rumah) —
+    memang harus diedit manual.
+  - Untuk hasil yang lebih lengkap: set `GOOGLE_MAPS_API_KEY` lalu ganti provider di
+    `src/app/api/geocode/route.ts`. Google: 10.000 geocoding/bulan gratis (skema per-SKU
+    sejak Maret 2025), tapi butuh akun billing + kartu.
 - Belum ada alur OTP. Ganti password memakai konfirmasi password sekarang (jalur yang
   tidak butuh layanan eksternal). Email login tidak bisa diubah sendiri, lewat admin.
 - Foto profil disimpan sebagai data URL di kolom `User.avatar`. Serverless Vercel tidak

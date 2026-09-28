@@ -146,6 +146,15 @@ export default function TrackingPage() {
             {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
           </p>
 
+          {order.pickupAddress && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Alamat penjemputan
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed">{order.pickupAddress}</p>
+            </div>
+          )}
+
           <Stepper current={currentStep} />
           <p className="text-sm">
             Tahap sekarang{" "}

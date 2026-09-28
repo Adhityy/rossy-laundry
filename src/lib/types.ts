@@ -20,6 +20,7 @@ export type Order = {
   washType: "LAUNDRY" | "DRY_CLEAN";
   status: string; // see ORDER_STATUSES
   deliveryType: "PICKUP" | "DELIVERY";
+  pickupAddress: string | null;
   deliveryFee: number;
   /** Stored as a JSON string by POST /api/orders; older rows may already be parsed. */
   items: string | OrderItemPayload[];

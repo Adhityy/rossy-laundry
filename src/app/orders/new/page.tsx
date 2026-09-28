@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Package, FileText, Bike, Truck, Minus, Plus, Send, Search } from "lucide-react";
+import { Package, FileText, Bike, Truck, Minus, Plus, Send, Search, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,10 @@ export default function NewOrderPage() {
   const [service, setService] = useState<Service>("kiloan");
   const [washType, setWashType] = useState<WashType>("LAUNDRY");
   const [delivery, setDelivery] = useState<Delivery>("PICKUP");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [locating, setLocating] = useState(false);
+  const [addrError, setAddrError] = useState<string | null>(null);
   const [weight, setWeight] = useState(MIN_ORDER_KG);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [query, setQuery] = useState("");
@@ -115,8 +119,86 @@ export default function NewOrderPage() {
     });
   }
 
+  /** Ambil lokasi perangkat -> terjemahkan jadi alamat lengkap -> isi textarea. */
+  function useMyLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setAddrError("Browser ini tidak mendukung pembacaan lokasi. Isi alamat manual.");
+      return;
+    }
+    setLocating(true);
+    setAddrError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const r = await fetch(
+            `/api/geocode?lat=${latitude.toFixed(6)}&lon=${longitude.toFixed(6)}`
+          );
+          const d = (await r.json()) as { address?: string | null; error?: string };
+          if (d.address) {
+            setPickupAddress(d.address);
+            setSuggestions([]);
+          } else {
+            setAddrError(d.error || "Lokasi tidak ditemukan. Isi alamat manual.");
+          }
+        } catch {
+          setAddrError("Gagal menerjemahkan lokasi. Isi alamat manual.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setAddrError(
+          err.code === err.PERMISSION_DENIED
+            ? "Izin lokasi ditolak. Isi alamat manual."
+            : "Tidak bisa membaca lokasi. Isi alamat manual."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60_000 }
+    );
+  }
+
+  // Saran alamat saat mengetik. Sengaja dibatasi 4-60 karakter supaya alamat hasil
+  // reverse geocode yang sudah lengkap tidak memicu pencarian ulang.
+  useEffect(() => {
+    const q = pickupAddress.trim();
+    if (delivery !== "DELIVERY" || q.length < 4 || q.length > 60) {
+      setSuggestions([]);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d: unknown) => {
+          if (!alive) return;
+          const items = (d as { items?: { address?: string }[] })?.items;
+          if (!Array.isArray(items)) return setSuggestions([]);
+          const list = items
+            .map((i) => i.address ?? "")
+            .filter((a) => a && a !== q)
+            .slice(0, 5);
+          setSuggestions(list);
+        })
+        .catch(() => {
+          if (alive) setSuggestions([]);
+        });
+    }, 450);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [pickupAddress, delivery]);
+
   async function handleSubmit() {
     setError(null);
+
+    if (delivery === "DELIVERY" && pickupAddress.trim().length < 10) {
+      setError("Alamat penjemputan wajib diisi, minimal 10 karakter.");
+      return;
+    }
 
     if (service === "kiloan" && weight < MIN_ORDER_KG) {
       setError(`Minimal order ${MIN_ORDER_KG} kg.`);
@@ -151,6 +233,7 @@ export default function NewOrderPage() {
           items,
           weight: service === "kiloan" ? weight : undefined,
           deliveryType: delivery,
+          pickupAddress: delivery === "DELIVERY" ? pickupAddress.trim() : undefined,
           deliveryFee,
           notes: notes || undefined,
         }),
@@ -449,9 +532,63 @@ export default function NewOrderPage() {
           </RadioGroup>
 
           {delivery === "DELIVERY" && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Kami akan menghubungi Anda lewat WhatsApp untuk mengatur jadwal jemput.
-            </p>
+            <div className="mt-4 space-y-3 border-t border-border pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Label htmlFor="o-addr">Alamat penjemputan</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={useMyLocation}
+                  disabled={locating}
+                >
+                  <MapPin size={15} strokeWidth={1.75} />
+                  {locating ? "Mencari lokasi..." : "Gunakan lokasi saya"}
+                </Button>
+              </div>
+
+              <Textarea
+                id="o-addr"
+                rows={3}
+                className="resize-none"
+                value={pickupAddress}
+                onChange={(e) => setPickupAddress(e.target.value)}
+                placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan"
+                aria-describedby="o-addr-hint"
+              />
+              <p id="o-addr-hint" className="text-xs text-muted-foreground">
+                Hasil dari lokasi bisa salah atau kurang. Periksa dan sunting sebelum kirim.
+              </p>
+
+              {addrError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {addrError}
+                </p>
+              )}
+
+              {suggestions.length > 0 && (
+                <ul className="overflow-hidden rounded-lg border border-border">
+                  {suggestions.map((s, i) => (
+                    <li key={`${s}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickupAddress(s);
+                          setSuggestions([]);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        {s}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="text-sm text-muted-foreground">
+                Kami akan menghubungi Anda lewat WhatsApp untuk mengatur jadwal jemput.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
