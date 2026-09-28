@@ -362,8 +362,6 @@ export default function NewOrderPage() {
           </>
         )}
       </Button>
-
-      {!session && status === "unauthenticated" && null}
     </div>
   );
 }
