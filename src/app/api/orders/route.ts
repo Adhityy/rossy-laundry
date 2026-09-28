@@ -27,8 +27,20 @@ export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const me = (session.user as { id: string }).id;
+
+  // Riwayat = milik akun ini, plus pesanan yang tercatat dengan nomor WhatsApp profil
+  // (misal pesanan yang dibuat saat belum login, atau input manual admin).
+  const profile = await prisma.user.findUnique({
+    where: { id: me },
+    select: { phone: true },
+  });
+  const phone = normalizePhone(profile?.phone ?? "");
+
   const orders = await prisma.order.findMany({
-    where: { userId: (session.user as any).id },
+    where: {
+      OR: [{ userId: me }, ...(phone ? [{ whatsapp: phone }] : [])],
+    },
     orderBy: { createdAt: "desc" },
     include: { statusLogs: { orderBy: { createdAt: "desc" } } },
   });

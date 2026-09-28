@@ -9,8 +9,11 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 2. **Buat pesanan** — kiloan (per kg) atau satuan (per potong). Tarif per potong diambil
    dari database (`PriceItem`) dan **dihitung ulang di server**, pelanggan pilih jenis
    cucian Laundry / Dry Clean. **Nomor WhatsApp wajib diisi** — itu kunci pelacakan
-3. **Cek pesanan tanpa login** — `/orders` berisi satu kolom cari (nomor resi atau nomor
-   WhatsApp). Nomor dinormalkan dulu supaya `0878 8056-8880` dan `6287880568880` cocok
+3. **Cek pesanan** — `/orders` menampilkan **riwayat langsung** kalau sudah login (tanpa
+   pencarian), dan **hanya satu kolom cari** (nomor resi atau nomor WhatsApp) kalau belum
+   login. Nomor dinormalkan dulu supaya `0878 8056-8880` dan `6287880568880` cocok.
+   Riwayat memakai `userId` **atau** nomor WhatsApp profil, jadi pesanan yang dibuat saat
+   belum login ikut muncul
 4. **Tracking 4 tahap** — Menunggu → Diproses → Siap Diambil → Selesai, plus riwayat
    status, polling tiap 5 detik
 5. **Pembatalan** — pelanggan boleh membatalkan selama masih **Menunggu**; admin boleh
