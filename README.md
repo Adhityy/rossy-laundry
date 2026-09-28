@@ -94,6 +94,11 @@ src/
   `GET /api/prices`. Empat sel tarif memang kosong di struk (Karpet Tebal/Tipis, Kasur
   Lantai Kecil/Besar) sehingga disimpan `null` dan tampil "Hubungi kami" — tidak bisa
   dipesan online.
+- **Harga dihitung di server.** `POST /api/orders` mengambil tarif dari tabel `PriceItem`
+  berdasarkan nama item dan `washType`, lalu menghitung ulang `subtotal` dan `deliveryFee`.
+  Angka `price`/`deliveryFee` dari klien diabaikan — pelanggan dengan halaman basi tetap
+  dibebankan harga terbaru, dan harga bisa tidak dikirim sama sekali dari sisi klien.
+  Item yang dinonaktifkan atau tarifnya kosong akan ditolak dengan pesan jelas.
 - **Tarif kiloan per kg tidak ada di struk.** Nilai `LAUNDRY_INFO.kiloanRate` di
   `src/lib/data.ts` masih angka lama (Rp 7.000/kg) — sesuaikan kalau beda.
 - **Alamat penjemputan** ada di kolom `Order.pickupAddress`. Isi lewat tombol "Gunakan
