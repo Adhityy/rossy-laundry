@@ -71,10 +71,13 @@ export async function GET(req: Request, { params }: Ctx) {
 
   // Data pelanggan hanya untuk admin.
   if (res.kind === "admin") {
-    const u = await prisma.user.findUnique({
-      where: { id: o.userId as string },
-      select: { id: true, name: true, email: true, phone: true, address: true, createdAt: true },
-    });
+    // Pesanan tamu punya userId null - jangan coba dicari di tabel User.
+    const u = o.userId
+      ? await prisma.user.findUnique({
+          where: { id: o.userId },
+          select: { id: true, name: true, email: true, phone: true, address: true, createdAt: true },
+        })
+      : null;
     return NextResponse.json({ ...base, user: u });
   }
 
