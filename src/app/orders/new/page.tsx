@@ -119,6 +119,39 @@ export default function NewOrderPage() {
     });
   }
 
+  type GeoLookup = { ok: true; address: string } | { ok: false; error: string };
+
+  /**
+   * Terjemahkan koordinat jadi alamat. Auto-retry sekali: Photon demo bisa gagal sesaat
+   * (throttle/timeout), dan itu sebaiknya tidak langsung ditampilkan sebagai kegagalan.
+   */
+  async function lookupAddress(lat: number, lon: number): Promise<GeoLookup> {
+    const url = `/api/geocode?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
+      try {
+        const res = await fetch(url);
+        const data = (await res.json()) as { address?: string | null; error?: string };
+
+        if (data.address) return { ok: true, address: data.address };
+        // 400: koordinat tidak valid, tidak ada gunanya diulang.
+        if (res.status === 400) return { ok: false, error: data.error || "Koordinat tidak valid." };
+        // 200 tanpa fitur: titik itu memang belum ada di peta, bukan kegagalan.
+        if (!data.error) {
+          return { ok: false, error: "Lokasi ini belum tercatat di peta. Isi alamat manual." };
+        }
+        // 502/throttle: layak dicoba ulang dulu.
+        if (attempt === 1) return { ok: false, error: data.error };
+      } catch {
+        if (attempt === 1) {
+          return { ok: false, error: "Tidak bisa terhubung ke layanan peta. Coba lagi." };
+        }
+      }
+    }
+    return { ok: false, error: "Layanan peta sedang sibuk. Coba lagi beberapa saat." };
+  }
+
   /** Ambil lokasi perangkat -> terjemahkan jadi alamat lengkap -> isi textarea. */
   function useMyLocation() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -131,16 +164,12 @@ export default function NewOrderPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const { latitude, longitude } = pos.coords;
-          const r = await fetch(
-            `/api/geocode?lat=${latitude.toFixed(6)}&lon=${longitude.toFixed(6)}`
-          );
-          const d = (await r.json()) as { address?: string | null; error?: string };
-          if (d.address) {
-            setPickupAddress(d.address);
+          const result = await lookupAddress(pos.coords.latitude, pos.coords.longitude);
+          if (result.ok) {
+            setPickupAddress(result.address);
             setSuggestions([]);
           } else {
-            setAddrError(d.error || "Lokasi tidak ditemukan. Isi alamat manual.");
+            setAddrError(result.error);
           }
         } catch {
           setAddrError("Gagal menerjemahkan lokasi. Isi alamat manual.");

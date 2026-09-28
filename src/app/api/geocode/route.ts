@@ -13,6 +13,9 @@ import { NextResponse } from "next/server";
  *  tetapi butuh akun billing + kartu).
  */
 
+// Photon bisa lambat di jam sibuk; beri ruang sebelum function dipotong.
+export const maxDuration = 15;
+
 const PHOTON = "https://photon.komoot.io";
 
 type PhotonProps = Record<string, string | undefined>;
@@ -66,7 +69,8 @@ export async function GET(req: Request) {
       const data = await photon("/reverse", { lat: String(nlat), lon: String(nlon) });
       const feature = data?.features?.[0];
       if (!feature?.properties) {
-        return NextResponse.json({ address: null });
+        // Koordinat valid tapi Photon tidak punya data di titik itu (laut, area kosong).
+        return NextResponse.json({ address: null, reason: "not_found" });
       }
       const address = formatAddress(feature.properties as PhotonProps);
       return NextResponse.json({
@@ -75,8 +79,9 @@ export async function GET(req: Request) {
         lon: feature.geometry?.coordinates?.[0] ?? null,
       });
     } catch {
+      // Kegagalan jaringan/timeout/throttle -> bedakan dari "lokasi tidak ditemukan".
       return NextResponse.json(
-        { error: "Lokasi tidak ditemukan. Isi alamat manual." },
+        { error: "Layanan peta sedang sibuk. Coba lagi beberapa saat." },
         { status: 502 }
       );
     }

@@ -53,15 +53,20 @@ export function ThemeToggle({ className }: { className?: string }) {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const reduce = useReducedMotion();
-  const isAdmin = pathname.startsWith("/admin");
+  // Panel admin harus bisa dicapai dari halaman mana pun selama sesi masih admin,
+  // bukan hanya ketika URL-nya sudah berprefix /admin.
+  const onAdminPath = pathname.startsWith("/admin");
+  const isRoleAdmin =
+    (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
+  const isAdmin = onAdminPath || isRoleAdmin;
   const authed = status === "authenticated";
   const items = isAdmin ? adminLinks : links;
 
-  const accountLabel = isAdmin ? "Lihat Situs" : authed ? "Profil" : "Masuk";
-  const accountHref = isAdmin ? "/" : authed ? "/profile" : "/login";
-  const accountPrimary = !isAdmin && !authed;
+  const accountLabel = onAdminPath ? "Lihat Situs" : authed ? "Profil" : "Masuk";
+  const accountHref = onAdminPath ? "/" : authed ? "/profile" : "/login";
+  const accountPrimary = !onAdminPath && !authed;
 
   const linkClass = (active: boolean) =>
     [
@@ -101,7 +106,7 @@ export function Navbar() {
             className="hidden sm:inline-flex"
           >
             <Link href={accountHref} className="flex items-center gap-1.5">
-              {!accountPrimary && !isAdmin && <UserRound size={15} strokeWidth={2} />}
+              {!accountPrimary && !onAdminPath && <UserRound size={15} strokeWidth={2} />}
               {accountLabel}
               {accountPrimary && <ArrowRight size={15} strokeWidth={2} />}
             </Link>
