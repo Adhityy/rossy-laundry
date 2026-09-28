@@ -1,87 +1,76 @@
-# Rossy Laundry — Full-Stack Sistem Manajemen Laundry
+# Rossy Laundry
 
-Sistem manajemen laundry lengkap dengan 7 fitur utama.
+Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 
 ## Fitur
 
-1. **Login & Registrasi** — Autentikasi pelanggan & admin
-2. **Buat Pesanan** — Kiloan/Satuan + opsi antar-jemput
-3. **Tracking Real-Time** — Progress bar visual + detail order
-4. **Riwayat Transaksi** — History pesanan + total pengeluaran
-5. **Notifikasi WhatsApp** — Siap integrasi (demo mode)
-6. **Laporan Pendapatan** — Tabel + grafik (Recharts)
-7. **Laporan Pengeluaran & Laba Rugi** — Input + perhitungan laba
+1. **Login & registrasi** — autentikasi pelanggan dan admin (NextAuth v5, credentials + JWT)
+2. **Buat pesanan** — kiloan (per kg) atau satuan (per potong), pilihan antar ke toko / antar jemput
+3. **Tracking status** — stepper 7 tahap dengan riwayat status, polling tiap 5 detik
+4. **Riwayat transaksi** — daftar pesanan pelanggan dan total pengeluaran
+5. **Notifikasi WhatsApp** — tombol kontak langsung ke WhatsApp (integrasi kirim otomatis belum ada)
+6. **Laporan pendapatan** — grafik batang per bulan dan diagram lingkaran per kategori pengeluaran
+7. **Laporan pengeluaran & laba rugi** — input pengeluaran, total, dan laba/rugi
 
 ## Stack
 
-- Next.js 15 (App Router) + TypeScript
-- Tailwind CSS 4 + Framer Motion
+- Next.js 15 (App Router) + TypeScript (`strict`)
+- Tailwind CSS **v4** (`@tailwindcss/postcss`, token di `@theme inline`)
+- shadcn/ui primitives (registry `new-york-v4`) di `src/components/ui/`
 - Prisma + SQLite
-- NextAuth.js v5 (credentials)
-- Recharts (grafik)
-- Lucide React (icons)
-- Sonner (toast notifications)
+- NextAuth v5 (credentials, strategi JWT)
+- Recharts, Framer Motion, Lucide, Sonner, Zod
+- Font Outfit lewat `next/font`
 
 ## Setup
 
 ```bash
-# 1. Install dependencies
+# 1. Dependensi (postinstall menjalankan prisma generate)
 npm install
 
-# 2. Setup database
-npx prisma db push
-npx prisma generate
+# 2. Buat tabel
+npm run db:push
 
-# 3. Seed data
-npx tsx prisma/seed.ts
+# 3. Data awal (admin@rossy.com / admin123, customer@rossy.com / customer123)
+npm run db:seed
 
-# 4. Jalankan dev server
+# 4. Jalankan
 npm run dev
 ```
 
 Buka http://localhost:3000
 
-## Akun Demo
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@rossy.com | admin123 |
-| Customer | customer@rossy.com | customer123 |
-
 ## Struktur
 
 ```
-app/
-├── page.tsx              # Landing page
-├── layout.tsx            # Root layout
-├── (auth)/login/         # Halaman login
-├── (auth)/register/      # Halaman registrasi
-├── orders/new/           # Buat pesanan
-├── orders/               # Riwayat pesanan
-├── orders/[id]/          # Tracking real-time
-├── admin/                # Dashboard admin
-├── admin/reports/        # Laporan pendapatan
-├── admin/expenses/       # Laporan pengeluaran
-└── api/                  # API routes
-components/               # Komponen React
-lib/                      # Utility & data
-prisma/                   # Database schema & seed
+src/
+├── app/
+│   ├── page.tsx              # Landing: Hero, Layanan, Fitur, Harga, CTA, Footer
+│   ├── layout.tsx            # Font, tema, navbar, toaster
+│   ├── (auth)/login/         # Masuk
+│   ├── (auth)/register/      # Daftar
+│   ├── orders/new/           # Buat pesanan
+│   ├── orders/               # Riwayat
+│   ├── orders/[id]/          # Tracking
+│   ├── admin/                # Dashboard
+│   ├── admin/reports/        # Laporan pendapatan
+│   ├── admin/expenses/       # Pengeluaran & laba rugi
+│   └── api/                  # Route handler (orders, expenses, reports, auth)
+├── components/               # Komponen situs + 21 primitif shadcn (ui/)
+├── lib/                      # auth, prisma, data, types, utils, theme
+└── ../prisma/                # schema.prisma, seed.ts
 ```
 
-## Info Laundry
+## Tema
 
-- **No. Telp:** 087880568880
-- **Alamat:** Jl. Balita 2 No. 85 Kunciran Mas Permai
-- **Operasional:** Senin-Minggu: 08.00 - 22.00
+- Palet: netral **zinc** + satu aksen **teal** (`#0f766e` light / `#2dd4bf` dark).
+- Mode gelap/terang lewat toggle di navbar, disimpan di `localStorage` (`rossy-theme`),
+  script anti-flash di `src/lib/theme.ts`.
+- Kontras: aksen light 5.27:1, aksen dark 10.7:1 (lolos WCAG AA).
 
-## Deploy
+## Catatan pengembangan
 
-```bash
-# Vercel
-npx vercel
-```
-
-Ubah DATABASE_URL ke PostgreSQL untuk production:
-```
-DATABASE_URL="postgresql://user:pass@host:5432/rossy"
-```
+- `POST /api/orders` menyimpan `items` sebagai string JSON, karena itu yang dibaca UI.
+- Alamat jemput/antar belum ada di schema maupun form — opsi "antar jemput" saat ini
+  hanya menambah ongkos, penjemputan diatur lewat WhatsApp.
+- Foto di `public/` dari Wikimedia Commons (lihat kredit di footer).

@@ -18,41 +18,32 @@ model User {
   orders    Order[]
 }
 
+// Fields mirror what POST /api/orders writes. `items` is stored as a JSON string
+// ([{ name, qty, price }]) rather than a child table, which is how the UI reads it.
 model Order {
-  id             String          @id @default(cuid())
-  userId         String
-  user           User            @relation(fields: [userId], references: [id])
-  orderNumber    String          @unique
-  status         String          @default("PENDING") // PENDING|PICKED_UP|WASHING|READY|DELIVERED|COMPLETED
-  isPickup       Boolean         @default(false)
-  pickupAddress  String?
-  deliveryAddress String?
-  notes          String?
-  totalPrice     Float           @default(0)
-  totalWeight    Float           @default(0)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  items          OrderItem[]
-  history        OrderStatusHistory[]
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id])
+  orderNumber  String          @unique
+  service      String // KILOAN | SATUAN
+  status       String          @default("PENDING") // see ORDER_STATUSES in lib/data.ts
+  deliveryType String // PICKUP | DELIVERY
+  deliveryFee  Float           @default(0)
+  items        String          @default("[]") // JSON: [{ name, qty, price }]
+  weight       Float?
+  total        Float           @default(0)
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  statusLogs   OrderStatusLog[]
 }
 
-model OrderItem {
-  id       String  @id @default(cuid())
-  orderId  String
-  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  name     String
-  quantity Float
-  unit     String  @default("KG") // KG | PCS
-  price    Float
-  subtotal Float
-}
-
-model OrderStatusHistory {
+model OrderStatusLog {
   id        String   @id @default(cuid())
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    String
-  notes     String?
+  note      String   @default("")
   createdAt DateTime @default(now())
 }
 

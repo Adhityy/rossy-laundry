@@ -4,13 +4,14 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "ADMIN") {
+  const role = session?.user ? (session.user as { role?: string }).role : undefined;
+  if (!session?.user || role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const orders = await prisma.order.findMany({ where: { status: "COMPLETED" } });
   const expenses = await prisma.expense.findMany();
 
-  const totalIncome = orders.reduce((s, o) => s + o.totalPrice, 0);
+  const totalIncome = orders.reduce((s, o) => s + o.total, 0);
   const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
   const profit = totalIncome - totalExpense;
 
@@ -22,7 +23,7 @@ export async function GET() {
   }
   for (const o of orders) {
     const key = String(o.createdAt.getMonth() + 1).padStart(2, "0");
-    monthly[key].income += o.totalPrice;
+    monthly[key].income += o.total;
   }
   for (const e of expenses) {
     const key = String(e.date.getMonth() + 1).padStart(2, "0");
