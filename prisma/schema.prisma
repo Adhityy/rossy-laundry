@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      String   @default("CUSTOMER") // CUSTOMER | ADMIN
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Order {
+  id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id])
+  orderNumber    String          @unique
+  status         String          @default("PENDING") // PENDING|PICKED_UP|WASHING|READY|DELIVERED|COMPLETED
+  isPickup       Boolean         @default(false)
+  pickupAddress  String?
+  deliveryAddress String?
+  notes          String?
+  totalPrice     Float           @default(0)
+  totalWeight    Float           @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  items          OrderItem[]
+  history        OrderStatusHistory[]
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name     String
+  quantity Float
+  unit     String  @default("KG") // KG | PCS
+  price    Float
+  subtotal Float
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  category    String   @default("OPERASIONAL") // OPERASIONAL|BAHAN|GAJI|LAINNYA
+  date        DateTime @default(now())
+}
