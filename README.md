@@ -13,6 +13,8 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 5. **Notifikasi WhatsApp** — tombol kontak langsung ke WhatsApp (integrasi kirim otomatis belum ada)
 6. **Laporan pendapatan** — grafik batang per bulan dan diagram lingkaran per kategori pengeluaran
 7. **Laporan pengeluaran & laba rugi** — input pengeluaran, total, dan laba/rugi
+8. **Profil** — foto profil (di-resize 160×160 di browser), nama, alamat, nomor WhatsApp,
+   dan ganti password dengan konfirmasi password sekarang
 
 ## Stack
 
@@ -94,5 +96,8 @@ src/
   `src/lib/data.ts` masih angka lama (Rp 7.000/kg) — sesuaikan kalau beda.
 - Alamat jemput/antar belum ada di schema maupun form. Opsi antar jemput hanya memilih
   cara pengangkutan, penjemputan diatur lewat WhatsApp.
-- Belum ada halaman ubah password. Akun admin diubah lewat database atau tambah sendiri.
+- Belum ada alur OTP. Ganti password memakai konfirmasi password sekarang (jalur yang
+  tidak butuh layanan eksternal). Email login tidak bisa diubah sendiri, lewat admin.
+- Foto profil disimpan sebagai data URL di kolom `User.avatar`. Serverless Vercel tidak
+  bisa menulis file ke disk; kalau nanti butuh foto besar, pindah ke Vercel Blob.
 - Foto di `public/` dari Wikimedia Commons (lihat kredit di footer).

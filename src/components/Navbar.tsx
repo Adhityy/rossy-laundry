@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Menu, X, Sun, Moon, Shirt, ArrowRight } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Menu, X, Sun, Moon, Shirt, ArrowRight, UserRound } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 
@@ -51,9 +52,15 @@ export function ThemeToggle({ className }: { className?: string }) {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { status } = useSession();
   const reduce = useReducedMotion();
   const isAdmin = pathname.startsWith("/admin");
+  const authed = status === "authenticated";
   const items = isAdmin ? adminLinks : links;
+
+  const accountLabel = isAdmin ? "Lihat Situs" : authed ? "Profil" : "Masuk";
+  const accountHref = isAdmin ? "/" : authed ? "/profile" : "/login";
+  const accountPrimary = !isAdmin && !authed;
 
   const linkClass = (active: boolean) =>
     [
@@ -87,17 +94,17 @@ export function Navbar() {
 
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          {isAdmin ? (
-            <Button asChild variant="outline" className="hidden sm:inline-flex">
-              <Link href="/">Lihat Situs</Link>
-            </Button>
-          ) : (
-            <Button asChild className="hidden sm:inline-flex">
-              <Link href="/login">
-                Masuk <ArrowRight size={15} strokeWidth={2} />
-              </Link>
-            </Button>
-          )}
+          <Button
+            asChild
+            variant={accountPrimary ? "default" : "outline"}
+            className="hidden sm:inline-flex"
+          >
+            <Link href={accountHref} className="flex items-center gap-1.5">
+              {!accountPrimary && !isAdmin && <UserRound size={15} strokeWidth={2} />}
+              {accountLabel}
+              {accountPrimary && <ArrowRight size={15} strokeWidth={2} />}
+            </Link>
+          </Button>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -130,9 +137,13 @@ export function Navbar() {
                   {l.label}
                 </Link>
               ))}
-              <Button asChild className="mt-2">
-                <Link href={isAdmin ? "/" : "/login"} onClick={() => setOpen(false)}>
-                  {isAdmin ? "Lihat Situs" : "Masuk"}
+              <Button
+                asChild
+                variant={accountPrimary ? "default" : "outline"}
+                className="mt-2"
+              >
+                <Link href={accountHref} onClick={() => setOpen(false)}>
+                  {accountLabel}
                 </Link>
               </Button>
             </div>

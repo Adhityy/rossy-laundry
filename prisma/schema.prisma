@@ -14,7 +14,9 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  phone     String?
+  phone     String? // nomor WhatsApp aktif
+  address   String?
+  avatar    String? // data URL (serverless tidak bisa menulis file ke disk)
   password  String
   role      String   @default("CUSTOMER") // CUSTOMER | ADMIN
   createdAt DateTime @default(now())
