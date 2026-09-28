@@ -17,12 +17,23 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 - Next.js 15 (App Router) + TypeScript (`strict`)
 - Tailwind CSS **v4** (`@tailwindcss/postcss`, token di `@theme inline`)
 - shadcn/ui primitives (registry `new-york-v4`) di `src/components/ui/`
-- Prisma + SQLite
+- Prisma + **PostgreSQL** (Neon) — SQLite tidak didukung Vercel
 - NextAuth v5 (credentials, strategi JWT)
 - Recharts, Framer Motion, Lucide, Sonner, Zod
 - Font Outfit lewat `next/font`
 
 ## Setup
+
+`.env` butuh empat variabel:
+
+```bash
+DATABASE_URL="postgresql://..."   # pooled    - query runtime
+DIRECT_URL="postgresql://..."     # unpooled  - prisma db push
+NEXTAUTH_SECRET=*** rand -base64 32)"
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+Kalau pakai Vercel + Neon: `vercel env pull` menarik semuanya otomatis.
 
 ```bash
 # 1. Dependensi (postinstall menjalankan prisma generate)

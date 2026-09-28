@@ -3,8 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime queries lewat pooler (serverless).
+  url       = env("DATABASE_URL")
+  // prisma db push / migrate harus lewat koneksi langsung, bukan pooler.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
