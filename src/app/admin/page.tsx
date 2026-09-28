@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, DollarSign, TrendingUp, Clock } from "lucide-react";
+import { Package, DollarSign, TrendingUp, Clock, FilePlus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -20,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { statusLabel } from "@/components/StatusBadge";
-import { ORDER_STATUSES, STATUS_IN_PROGRESS } from "@/lib/data";
+import { statusLabel, StatusBadge } from "@/components/StatusBadge";
+import { ORDER_STATUSES, STATUS_IN_PROGRESS, SERVICE_AREA, STATUS_CANCELLED } from "@/lib/data";
 
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { Order } from "@/lib/types";
@@ -81,11 +82,21 @@ export default function AdminDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Ringkasan pesanan dan pendapatan.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ringkasan pesanan dan pendapatan.
+          </p>
+          <p className="mt-4 max-w-[62ch] rounded-lg border border-border bg-card px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
+            {SERVICE_AREA}
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/orders/new?manual=1">
+            <FilePlus size={15} strokeWidth={2} /> Pesanan manual
+          </Link>
+        </Button>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -151,25 +162,29 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="mt-3 flex items-center justify-between gap-3">
-                        <Select
-                          value={o.status}
-                          onValueChange={(v) => changeStatus(o.id, v)}
-                          disabled={savingId === o.id}
-                        >
-                          <SelectTrigger
-                            className="h-9 w-[150px] text-xs"
-                            aria-label="Ubah status"
+                        {o.status === STATUS_CANCELLED ? (
+                          <StatusBadge status={o.status} />
+                        ) : (
+                          <Select
+                            value={o.status}
+                            onValueChange={(v) => changeStatus(o.id, v)}
+                            disabled={savingId === o.id}
                           >
-                            <SelectValue placeholder={statusLabel(o.status)} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ORDER_STATUSES.map((s) => (
-                              <SelectItem key={s.key} value={s.key}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            <SelectTrigger
+                              className="h-9 w-[150px] text-xs"
+                              aria-label="Ubah status"
+                            >
+                              <SelectValue placeholder={statusLabel(o.status)} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ORDER_STATUSES.map((s) => (
+                                <SelectItem key={s.key} value={s.key}>
+                                  {s.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <Link
                           href={`/orders/${o.id}`}
                           className="shrink-0 text-sm text-primary hover:underline"
@@ -216,25 +231,29 @@ export default function AdminDashboard() {
                           {formatDateTime(o.createdAt)}
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={o.status}
-                            onValueChange={(v) => changeStatus(o.id, v)}
-                            disabled={savingId === o.id}
-                          >
-                            <SelectTrigger
-                              className="h-8 w-[150px] text-xs"
-                              aria-label="Ubah status"
+                          {o.status === STATUS_CANCELLED ? (
+                            <StatusBadge status={o.status} />
+                          ) : (
+                            <Select
+                              value={o.status}
+                              onValueChange={(v) => changeStatus(o.id, v)}
+                              disabled={savingId === o.id}
                             >
-                              <SelectValue placeholder={statusLabel(o.status)} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ORDER_STATUSES.map((s) => (
-                                <SelectItem key={s.key} value={s.key}>
-                                  {s.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              <SelectTrigger
+                                className="h-8 w-[150px] text-xs"
+                                aria-label="Ubah status"
+                              >
+                                <SelectValue placeholder={statusLabel(o.status)} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ORDER_STATUSES.map((s) => (
+                                  <SelectItem key={s.key} value={s.key}>
+                                    {s.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </TableCell>
                         <TableCell className="tabular text-right font-medium">
                           {formatCurrency(o.total)}

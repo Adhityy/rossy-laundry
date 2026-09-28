@@ -1,143 +1,158 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Package, ArrowRight } from "lucide-react";
+import { Search, PackageOpen, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { Order } from "@/lib/types";
 
-function ListSkeleton() {
-  return (
-    <div className="space-y-3" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2.5">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-44" />
-              <Skeleton className="h-3 w-28" />
-            </div>
-            <div className="space-y-2.5 text-right">
-              <Skeleton className="ml-auto h-5 w-24" />
-              <Skeleton className="ml-auto h-8 w-24" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
+/** Cocokkan nomor resi atau nomor WhatsApp - tidak perlu login. */
 export default function OrdersPage() {
+  const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/orders")
-      .then((r) => r.json())
-      .then((d: unknown) => {
-        if (!alive) return;
-        setOrders(Array.isArray(d) ? (d as Order[]) : []);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  async function search(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = query.trim();
+    if (q.length < 4) {
+      setError("Masukkan nomor resi atau nomor WhatsApp minimal 4 karakter.");
+      setOrders([]);
+      setSearched(true);
+      return;
+    }
 
-  const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);
+    setError(null);
+    setLoading(true);
+    setSearched(true);
+    try {
+      const res = await fetch(`/api/orders/lookup?q=${encodeURIComponent(q)}`);
+      const data = (await res.json()) as { orders?: Order[]; error?: string };
+      if (!res.ok) {
+        setError(data.error || "Pencarian gagal.");
+        setOrders([]);
+        return;
+      }
+      setOrders(data.orders ?? []);
+    } catch {
+      setError("Tidak bisa terhubung ke server.");
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Riwayat pesanan</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Total pengeluaran{" "}
-            <span className="tabular font-medium text-foreground">
-              {formatCurrency(totalSpent)}
-            </span>
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/orders/new">
-            Buat Pesanan <ArrowRight size={15} strokeWidth={2} />
-          </Link>
-        </Button>
+    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      <header>
+        <h1 className="text-3xl font-semibold tracking-tight">Cek pesanan</h1>
+        <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-muted-foreground">
+          Masukkan nomor resi atau nomor WhatsApp yang dipakai saat memesan. Tidak perlu
+          masuk akun.
+        </p>
       </header>
 
-      <div className="mt-8">
-        {loading ? (
-          <ListSkeleton />
-        ) : orders.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
-            <span className="mx-auto grid size-11 place-items-center rounded-md bg-accent text-muted-foreground">
-              <Package size={20} strokeWidth={1.75} />
-            </span>
-            <h2 className="mt-5 text-lg font-semibold">Belum ada pesanan</h2>
-            <p className="mx-auto mt-2 max-w-[42ch] text-sm leading-relaxed text-muted-foreground">
-              Semua cucian yang Anda pesan beserta statusnya akan tercatat di sini.
-            </p>
-            <Button asChild className="mt-6">
-              <Link href="/orders/new">
-                Buat Pesanan <ArrowRight size={15} strokeWidth={2} />
-              </Link>
-            </Button>
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {orders.map((order, i) => (
-              <li key={order.id}>
-                <Card
-                  className="transition-shadow hover:shadow-md"
-                  style={{ animationDelay: `${i * 40}ms` }}
-                >
-                  <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="tabular text-sm font-medium text-muted-foreground">
-                          {order.orderNumber}
-                        </span>
-                        <StatusBadge status={order.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(order.createdAt)}
-                      </p>
-                      <p className="text-sm">
-                        {order.service === "KILOAN" ? "Kiloan" : "Satuan"}
-                        {order.service !== "KILOAN" && (
-                          <span className="text-muted-foreground">
-                            {" · "}
-                            {order.washType === "DRY_CLEAN" ? "Dry clean" : "Laundry"}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground">
-                          {" · "}
-                          {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
-                        </span>
-                      </p>
-                    </div>
+      <form onSubmit={search} className="mt-6 flex gap-2">
+        <div className="relative flex-1">
+          <Search
+            size={16}
+            strokeWidth={1.75}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="RL-260928-1234 atau 08xxxxxxxxxx"
+            aria-label="Nomor resi atau nomor WhatsApp"
+            className="h-11 pl-9"
+            autoComplete="off"
+          />
+        </div>
+        <Button type="submit" size="lg" disabled={loading} className="h-11">
+          {loading ? "Mencari..." : "Cari"}
+        </Button>
+      </form>
 
-                    <div className="flex flex-col items-end gap-2.5">
-                      <span className="tabular text-lg font-semibold">
-                        {formatCurrency(order.total)}
-                      </span>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/orders/${order.id}`}>Detail</Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-8 space-y-4">
+        {loading && (
+          <>
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+          </>
+        )}
+
+        {!loading && searched && !error && orders.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+              <PackageOpen size={28} strokeWidth={1.5} className="text-muted-foreground" />
+              <p className="text-sm font-medium">Pesanan tidak ditemukan</p>
+              <p className="max-w-[42ch] text-sm text-muted-foreground">
+                Periksa kembali nomor yang diketik. Kalau pesanan Anda diantar ke toko,
+                nomor WhatsApp-nya dipakai oleh pihak laundry.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/orders/new">Buat pesanan baru</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {orders.map((o) => (
+          <Card key={o.id}>
+            <CardContent className="flex flex-col gap-3 py-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="tabular text-sm font-medium">{o.orderNumber}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDateTime(o.createdAt)}
+                  </p>
+                </div>
+                <StatusBadge status={o.status} />
+              </div>
+
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+                <span className="text-muted-foreground">
+                  {o.service === "KILOAN" ? "Kiloan" : "Satuan"}
+                  {o.service !== "KILOAN" &&
+                    ` · ${o.washType === "DRY_CLEAN" ? "Dry clean" : "Laundry"}`}
+                  {" · "}
+                  {o.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
+                </span>
+                <span className="tabular font-semibold">{formatCurrency(o.total)}</span>
+              </div>
+
+              <div className="flex justify-end">
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/orders/${o.id}`}>
+                    Lihat detail <ArrowRight size={15} strokeWidth={2} />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {!searched && (
+          <Alert>
+            <AlertTitle>Tidak tahu nomor resinya?</AlertTitle>
+            <AlertDescription>
+              Pakai nomor WhatsApp yang Anda isi saat memesan. Pesanan yang diantar ke toko
+              juga tercatat dengan nomor yang sama.
+            </AlertDescription>
+          </Alert>
         )}
       </div>
     </div>

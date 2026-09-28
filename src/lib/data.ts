@@ -23,23 +23,29 @@ export const CATEGORY_LABELS: Record<string, string> = {
   RUMAH_TANGGA: "Rumah tangga",
 };
 
-// Urutan status yang dipakai API PATCH /api/orders/[id]/status dan dropdown admin.
+// Urutan tahap yang dipakai API dan stepper pelanggan.
+// Empat tahap saja. Pembatalan bukan tahap: statusnya DIBATALKAN dan berdiri sendiri.
 // Warna tidak disimpan di sini: satu aksen (primary) dipakai untuk semua status,
 // tahap dibedakan lewat langkah (step) dan label.
 export const ORDER_STATUSES = [
-  { key: "PENDING", label: "Menunggu", step: 1 },
-  { key: "WASHING", label: "Dicuci", step: 2 },
-  { key: "DRYING", label: "Dikeringkan", step: 3 },
-  { key: "IRONING", label: "Disetrika", step: 4 },
-  { key: "PACKING", label: "Dikemas", step: 5 },
-  { key: "READY", label: "Siap Diambil", step: 6 },
-  { key: "COMPLETED", label: "Selesai", step: 7 },
+  { key: "MENUNGGU", label: "Menunggu", step: 1 },
+  { key: "DIPROSES", label: "Diproses", step: 2 },
+  { key: "SIAP_DIAMBIL", label: "Siap Diambil", step: 3 },
+  { key: "SELESAI", label: "Selesai", step: 4 },
 ] as const;
+
+export const TOTAL_STEPS = ORDER_STATUSES.length;
+
+/** Status terminal di luar tahapan. */
+export const STATUS_CANCELLED = "DIBATALKAN";
+
+/** Cakupan layanan antar-jemput. */
+export const SERVICE_AREA = "Hanya melayani antar-jemput wilayah Kunciran Indah, Kunciran Jaya, dan sekitarnya.";
 
 export type OrderStatusKey = (typeof ORDER_STATUSES)[number]["key"];
 
 export const STATUS_IN_PROGRESS: readonly string[] = ORDER_STATUSES.map((s) => s.key).filter(
-  (k) => k !== "COMPLETED"
+  (k) => k !== "SELESAI"
 );
 
 // Ongkos antar jemput. 0 = gratis. Tampil di UI sebagai "Gratis", bukan "Rp 0".

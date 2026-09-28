@@ -23,16 +23,20 @@ model User {
   orders    Order[]
 }
 
-// Fields mirror what POST /api/orders writes. `items` is stored as a JSON string
-// ([{ name, qty, price }]) rather than a child table, which is how the UI reads it.
 model Order {
-  id           String          @id @default(cuid())
-  userId       String
-  user         User            @relation(fields: [userId], references: [id])
-  orderNumber  String          @unique
+  id           String    @id @default(cuid())
+  userId       String? // null = pesanan tamu atau input manual admin
+  user         User?     @relation(fields: [userId], references: [id])
+  orderNumber  String    @unique
+  // Kunci pencarian pelanggan: isi nomor WhatsApp, format digit saja.
+  // Default "" hanya supaya kolom bisa ditambahkan ke tabel yang sudah berisi baris;
+  // API selalu mengisi nilai ternormalisasi dan pencarian menolak nilai kosong.
+  whatsapp     String    @default("")
   service      String // KILOAN | SATUAN
   washType     String          @default("LAUNDRY") // LAUNDRY | DRY_CLEAN (kolom tarif di struk)
-  status       String          @default("PENDING") // see ORDER_STATUSES in lib/data.ts
+  status       String          @default("MENUNGGU") // see ORDER_STATUSES in lib/data.ts
+  cancelReason String? // diisi saat pembatalan
+  cancelledAt  DateTime?
   deliveryType String // PICKUP | DELIVERY
   pickupAddress String? // isi pelanggan saat antar jemput, boleh diedit manual
   deliveryFee  Float           @default(0)
@@ -43,6 +47,9 @@ model Order {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   statusLogs   OrderStatusLog[]
+
+  @@index([whatsapp])
+  @@index([userId])
 }
 
 model OrderStatusLog {

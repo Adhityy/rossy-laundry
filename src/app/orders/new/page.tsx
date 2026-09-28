@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Package, FileText, Bike, Truck, Minus, Plus, Send, Search, MapPin } from "lucide-react";
+import { Package, FileText, Bike, Truck, Minus, Plus, Send, Search, MapPin, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DELIVERY_FEE, MIN_ORDER_KG, LAUNDRY_INFO } from "@/lib/data";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, normalizePhone } from "@/lib/utils";
 import type { PriceItem } from "@/lib/types";
 
 type Service = "kiloan" | "satuan";
@@ -35,6 +35,7 @@ function priceOf(item: PriceItem, wash: WashType): number | null {
 export default function NewOrderPage() {
   const router = useRouter();
   const { status } = useSession();
+  const [manual, setManual] = useState(false);
 
   const [service, setService] = useState<Service>("kiloan");
   const [washType, setWashType] = useState<WashType>("LAUNDRY");
@@ -46,15 +47,35 @@ export default function NewOrderPage() {
   const [weight, setWeight] = useState(MIN_ORDER_KG);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [query, setQuery] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [notes, setNotes] = useState("");
   const [prices, setPrices] = useState<PriceItem[]>([]);
   const [pricesLoading, setPricesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pesanan boleh tanpa login. Kalau sudah masuk, isi nomornya dari profil.
+  // Kecuali mode manual: admin mengisi pesanan atas nama pelanggan, jadi nomor profilnya
+  // tidak boleh ikut terisi.
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+    const isManual =
+      new URLSearchParams(window.location.search).get("manual") === "1";
+    if (isManual || status !== "authenticated") return;
+    let alive = true;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { phone?: string | null } | null) => {
+        if (alive && d?.phone) setWhatsapp((prev) => prev || d.phone || "");
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [status]);
+
+  useEffect(() => {
+    setManual(new URLSearchParams(window.location.search).get("manual") === "1");
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -224,6 +245,12 @@ export default function NewOrderPage() {
   async function handleSubmit() {
     setError(null);
 
+    const wa = normalizePhone(whatsapp);
+    if (!wa) {
+      setError("Nomor WhatsApp wajib diisi dengan benar, contoh 08xxxxxxxxxx.");
+      return;
+    }
+
     if (delivery === "DELIVERY" && pickupAddress.trim().length < 10) {
       setError("Alamat penjemputan wajib diisi, minimal 10 karakter.");
       return;
@@ -261,6 +288,7 @@ export default function NewOrderPage() {
           washType,
           items,
           weight: service === "kiloan" ? weight : undefined,
+          whatsapp: wa,
           deliveryType: delivery,
           pickupAddress: delivery === "DELIVERY" ? pickupAddress.trim() : undefined,
           deliveryFee,
@@ -273,7 +301,13 @@ export default function NewOrderPage() {
         setError(body?.error || "Gagal membuat pesanan. Coba lagi.");
         return;
       }
-      router.push("/orders");
+      const created = (await res.json()) as { id?: string; orderNumber?: string };
+      if (created.id) {
+        // Bawa nomor yang tadi diketik supaya halaman detail bisa langsung dibuka tanpa login.
+        router.push(`/orders/${created.id}?phone=${encodeURIComponent(wa)}`);
+      } else {
+        router.push("/orders");
+      }
     } catch {
       setError("Tidak bisa terhubung ke server. Coba lagi.");
     } finally {
@@ -281,7 +315,7 @@ export default function NewOrderPage() {
     }
   }
 
-  if (status === "loading" || pricesLoading) {
+  if (pricesLoading) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 px-4 py-12 sm:px-6">
         <Skeleton className="h-8 w-56" />
@@ -300,6 +334,17 @@ export default function NewOrderPage() {
           dihitung otomatis.
         </p>
       </header>
+
+      {manual && (
+        <Alert>
+          <Info size={16} />
+          <AlertTitle>Pesanan manual atas nama pelanggan</AlertTitle>
+          <AlertDescription>
+            Isi nomor WhatsApp pelanggan di bawah, bukan nomor Anda. Pelanggan memakai nomor
+            itulah untuk mengecek pesanan nanti.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader className="space-y-0 pb-3">
@@ -526,6 +571,35 @@ export default function NewOrderPage() {
           </Card>
         </>
       )}
+
+      <Card>
+        <CardHeader className="space-y-1 pb-3">
+          <CardTitle className="text-base">Nomor WhatsApp</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Nomor ini dipakai untuk melacak pesanan Anda.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="o-wa">Nomor WhatsApp</Label>
+          <Input
+            id="o-wa"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="08xxxxxxxxxx"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            aria-describedby="o-wa-hint"
+          />
+          <p id="o-wa-hint" className="text-xs text-muted-foreground">
+            {manual
+              ? "Nomor pelanggan yang meneruskan cucian."
+              : status === "authenticated"
+                ? "Terisi otomatis dari profil, boleh diganti."
+                : "Wajib diisi. Dengan nomor ini Anda bisa cek pesanan tanpa masuk akun."}
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="space-y-0 pb-3">

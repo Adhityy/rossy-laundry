@@ -1,34 +1,44 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Check, Info } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
+import { ArrowLeft, Ban, Check, Info, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { StatusBadge, statusLabel, statusStep } from "@/components/StatusBadge";
-import { ORDER_STATUSES } from "@/lib/data";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { ORDER_STATUSES, STATUS_CANCELLED, TOTAL_STEPS } from "@/lib/data";
+import { formatCurrency, formatDateTime, formatPhone } from "@/lib/utils";
 import { parseItems, type Order } from "@/lib/types";
 
-const LAST_STEP = ORDER_STATUSES.length;
+type Detail = Order & {
+  user?: { id: string; name: string; email: string; phone: string | null; address: string | null } | null;
+};
 
-function Stepper({ current }: { current: number }) {
-  const progress = ((current - 1) / (LAST_STEP - 1)) * 100;
+function Stepper({ current, cancelled }: { current: number; cancelled: boolean }) {
+  const progress = ((current - 1) / (TOTAL_STEPS - 1)) * 100;
+  const cell = `flex w-[calc(100%/${TOTAL_STEPS})] flex-col items-center gap-2`;
 
   return (
     <div className="relative py-2">
       <div className="absolute inset-x-0 top-[26px] h-px bg-border" />
       <div
-        className="absolute left-0 top-[26px] h-px bg-primary transition-all duration-700"
-        style={{ width: `${progress}%` }}
+        className={[
+          "absolute left-0 top-[26px] h-px transition-all duration-700",
+          cancelled ? "bg-border" : "bg-primary",
+        ].join(" ")}
+        style={{ width: `${cancelled ? 0 : progress}%` }}
       />
       <ol className="relative flex justify-between">
         {ORDER_STATUSES.map((s, i) => {
           const step = i + 1;
-          const done = step <= current;
+          const done = !cancelled && step <= current;
           return (
-            <li key={s.key} className="flex w-[14.28%] flex-col items-center gap-2">
+            <li key={s.key} className={cell}>
               <span
                 className={[
                   "grid size-7 place-items-center rounded-full border text-xs font-medium transition-colors",
@@ -36,11 +46,11 @@ function Stepper({ current }: { current: number }) {
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background text-muted-foreground",
                 ].join(" ")}
-                aria-current={step === current ? "step" : undefined}
+                aria-current={step === current && !cancelled ? "step" : undefined}
               >
                 {done ? <Check size={14} strokeWidth={2.5} /> : step}
               </span>
-              <span className="hidden text-center text-[10px] leading-tight text-muted-foreground sm:block">
+              <span className="text-center text-[11px] leading-tight text-muted-foreground">
                 {s.label}
               </span>
             </li>
@@ -54,31 +64,72 @@ function Stepper({ current }: { current: number }) {
 export default function TrackingPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const [order, setOrder] = useState<Order | { error: string } | null>(null);
+  const [order, setOrder] = useState<Detail | { error: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [reason, setReason] = useState("");
+  const { data: session } = useSession();
+  const isAdmin =
+    (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    try {
+      // Tamu membawa nomor yang dipakai saat pencarian; pemilik/admin tidak perlu.
+      const q = phone ? `?phone=${encodeURIComponent(phone)}` : "";
+      const res = await fetch(`/api/orders/${id}${q}`);
+      const data = await res.json();
+      setOrder(data as Detail | { error: string });
+    } catch {
+      /* biarkan state lama, polling berikutnya mencoba lagi */
+    } finally {
+      setLoading(false);
+    }
+  }, [id, phone]);
+
+  // Baca ?phone sekali, baru mulai polling - supaya tamu tidak memicu fetch 403.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    setPhone(sp.get("phone"));
+    setReady(true);
+  }, [id]);
 
   useEffect(() => {
-    if (!id) return;
-    let alive = true;
-    const load = () => {
-      fetch(`/api/orders/${id}`)
-        .then((r) => r.json())
-        .then((d: unknown) => {
-          if (!alive) return;
-          setOrder(d as Order | { error: string });
-          setLoading(false);
-        })
-        .catch(() => {
-          if (alive) setLoading(false);
-        });
-    };
+    if (!ready) return;
     load();
     const timer = window.setInterval(load, 5000);
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-    };
-  }, [id]);
+    return () => window.clearInterval(timer);
+  }, [ready, load]);
+
+  async function cancelOrder() {
+    if (isAdmin && reason.trim().length < 3) {
+      toast.error("Alasan pembatalan wajib diisi (minimal 3 karakter).");
+      return;
+    }
+    setCancelling(true);
+    try {
+      const q = phone && !isAdmin ? `?phone=${encodeURIComponent(phone)}` : "";
+      const res = await fetch(`/api/orders/${id}${q}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", reason: reason.trim() || undefined }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.error(data.error || "Gagal membatalkan pesanan.");
+        return;
+      }
+      toast.success("Pesanan dibatalkan.");
+      setReason("");
+      await load();
+    } catch {
+      toast.error("Tidak bisa terhubung ke server.");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -98,24 +149,26 @@ export default function TrackingPage() {
         </span>
         <h1 className="mt-5 text-lg font-semibold">Pesanan tidak ditemukan</h1>
         <p className="mx-auto mt-2 max-w-[40ch] text-sm text-muted-foreground">
-          Pesanan mungkin sudah dihapus atau bukan milik akun Anda.
+          Pesanan mungkin sudah dihapus, atau nomor yang Anda masukkan tidak cocok.
         </p>
         <Button asChild variant="outline" className="mt-6">
-          <Link href="/orders">Lihat riwayat</Link>
+          <Link href="/orders">Cari lagi</Link>
         </Button>
       </div>
     );
   }
 
+  const cancelled = order.status === STATUS_CANCELLED;
   const currentStep = statusStep(order.status);
   const items = parseItems(order.items);
   const logs = [...(order.statusLogs ?? [])];
+  const canCancel = !cancelled && (isAdmin || order.status === "MENUNGGU");
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-12 sm:px-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href="/orders">
-          <ArrowLeft size={15} strokeWidth={2} /> Kembali
+          <ArrowLeft size={15} strokeWidth={2} /> Cek pesanan lain
         </Link>
       </Button>
 
@@ -146,6 +199,11 @@ export default function TrackingPage() {
             {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
           </p>
 
+          <p className="text-sm text-muted-foreground">
+            WhatsApp
+            <span className="tabular ml-2 text-foreground">{formatPhone(order.whatsapp)}</span>
+          </p>
+
           {order.pickupAddress && (
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -155,13 +213,68 @@ export default function TrackingPage() {
             </div>
           )}
 
-          <Stepper current={currentStep} />
+          {cancelled && (
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Dibatalkan {order.cancelledAt ? formatDateTime(order.cancelledAt) : ""}
+              </p>
+              <p className="mt-1.5 text-sm">
+                {order.cancelReason || "Tanpa keterangan."}
+              </p>
+            </div>
+          )}
+
+          <Stepper current={currentStep} cancelled={cancelled} />
           <p className="text-sm">
             Tahap sekarang{" "}
             <span className="font-medium">{statusLabel(order.status)}</span>
           </p>
         </CardContent>
       </Card>
+
+      {isAdmin && order.user && (
+        <Card>
+          <CardHeader className="space-y-0 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <UserRound size={16} strokeWidth={1.75} /> Informasi pelanggan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Nama
+              </p>
+              <p className="mt-1 text-sm">{order.user.name}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Nomor WhatsApp
+              </p>
+              <p className="tabular mt-1 text-sm">{formatPhone(order.whatsapp)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Email
+              </p>
+              <p className="mt-1 text-sm">{order.user.email}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Telepon akun
+              </p>
+              <p className="tabular mt-1 text-sm">
+                {order.user.phone ? formatPhone(order.user.phone) : "—"}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Alamat akun
+              </p>
+              <p className="mt-1 text-sm">{order.user.address || "—"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="space-y-0 pb-3">
@@ -212,6 +325,11 @@ export default function TrackingPage() {
             </div>
           ))}
 
+          <div className="flex items-baseline justify-between gap-4 border-t border-border pt-3">
+            <span className="text-sm font-medium">Total</span>
+            <span className="tabular text-sm font-semibold">{formatCurrency(order.total)}</span>
+          </div>
+
           {order.notes && (
             <div className="mt-4 rounded-md border border-border bg-muted px-3.5 py-3">
               <p className="text-xs font-medium text-muted-foreground">Catatan</p>
@@ -220,6 +338,43 @@ export default function TrackingPage() {
           )}
         </CardContent>
       </Card>
+
+      {canCancel && (
+        <Card className="border-destructive/40">
+          <CardHeader className="space-y-0 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Ban size={16} strokeWidth={1.75} /> Batalkan pesanan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {isAdmin
+                ? "Admin dapat membatalkan pesanan pada tahap mana pun. Alasan wajib dicatat."
+                : "Pesanan masih Tahap Menunggu, jadi masih bisa dibatalkan."}
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason">
+                Alasan {isAdmin ? "" : "(opsional)"}
+              </Label>
+              <Textarea
+                id="cancel-reason"
+                rows={2}
+                className="resize-none"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={isAdmin ? "Misal: pelanggan membatalkan lewat telepon" : ""}
+              />
+            </div>
+            <Button
+              variant="destructive"
+              onClick={cancelOrder}
+              disabled={cancelling || (isAdmin && reason.trim().length < 3)}
+            >
+              {cancelling ? "Membatalkan..." : "Batalkan pesanan"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

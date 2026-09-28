@@ -16,9 +16,13 @@ export type OrderStatusLog = {
 export type Order = {
   id: string;
   orderNumber: string;
+  userId?: string | null;
+  whatsapp: string;
   service: string; // KILOAN | SATUAN
   washType: "LAUNDRY" | "DRY_CLEAN";
-  status: string; // see ORDER_STATUSES
+  status: string; // see ORDER_STATUSES, or DIBATALKAN
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
   deliveryType: "PICKUP" | "DELIVERY";
   pickupAddress: string | null;
   deliveryFee: number;

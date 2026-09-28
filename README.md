@@ -4,19 +4,30 @@ Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 
 ## Fitur
 
-1. **Login & registrasi** — autentikasi pelanggan dan admin (NextAuth v5, credentials + JWT)
+1. **Login & registrasi** — opsional. Pesanan dan pelacakan bisa jalan tanpa akun
+   (NextAuth v5, credentials + JWT)
 2. **Buat pesanan** — kiloan (per kg) atau satuan (per potong). Tarif per potong diambil
-   dari database (`PriceItem`), pelanggan pilih jenis cucian Laundry / Dry Clean dan
-   totalnya dihitung otomatis
-3. **Tracking status** — stepper 7 tahap dengan riwayat status, polling tiap 5 detik
-4. **Riwayat transaksi** — daftar pesanan pelanggan dan total pengeluaran
-5. **Notifikasi WhatsApp** — tombol kontak langsung ke WhatsApp (integrasi kirim otomatis belum ada)
-6. **Laporan pendapatan** — grafik batang per bulan dan diagram lingkaran per kategori pengeluaran
-7. **Laporan pengeluaran & laba rugi** — input pengeluaran, total, dan laba/rugi
-8. **Profil** — foto profil (di-resize 160×160 di browser), nama, alamat, nomor WhatsApp,
-   dan ganti password dengan konfirmasi password sekarang
-9. **Kelola harga (admin)** — edit tarif laundry & dry clean inline, sembunyikan item tanpa
+   dari database (`PriceItem`) dan **dihitung ulang di server**, pelanggan pilih jenis
+   cucian Laundry / Dry Clean. **Nomor WhatsApp wajib diisi** — itu kunci pelacakan
+3. **Cek pesanan tanpa login** — `/orders` berisi satu kolom cari (nomor resi atau nomor
+   WhatsApp). Nomor dinormalkan dulu supaya `0878 8056-8880` dan `6287880568880` cocok
+4. **Tracking 4 tahap** — Menunggu → Diproses → Siap Diambil → Selesai, plus riwayat
+   status, polling tiap 5 detik
+5. **Pembatalan** — pelanggan boleh membatalkan selama masih **Menunggu**; admin boleh
+   membatalkan kapan pun **dengan alasan wajib**. Status `DIBATALKAN` berdiri di luar
+   tahapan, tidak bisa diubah lagi
+6. **Pesanan manual (admin)** — pelanggan yang antar ke toko diinput admin lewat tombol
+   *Pesanan manual*: isi nomor WhatsApp pelanggan, sisanya seperti form biasa
+7. **Informasi pelanggan (admin)** — di halaman `/orders/{id}`, admin melihat nama,
+   nomor WhatsApp, email, dan alamat akun. Penampil tamu tidak melihat ini
+8. **Kelola harga (admin)** — edit tarif laundry & dry clean inline, sembunyikan item tanpa
    menghapus, tambah dan hapus item, satu tombol simpan untuk semua perubahan
+9. **Profil** — foto profil (di-resize 160×160 di browser), nama, alamat, nomor WhatsApp,
+   dan ganti password dengan konfirmasi password sekarang
+10. **Laporan** — grafik pendapatan per bulan, laba/rugi, diagram pengeluaran per kategori
+11. **Notifikasi WhatsApp** — tombol kontak langsung ke WhatsApp (integrasi kirim otomatis belum ada)
+
+Cakupan layanan (ditampilkan di dashboard admin): `SERVICE_AREA` di `src/lib/data.ts`.
 
 ## Stack
 
@@ -87,7 +98,20 @@ src/
 
 ## Catatan pengembangan
 
+- **Tahapan status ada 4**: `MENUNGGU`, `DIPROSES`, `SIAP_DIAMBIL`, `SELESAI`, plus
+  `DIBATALKAN` sebagai status terminal di luar tahapan (`ORDER_STATUSES` dan
+  `STATUS_CANCELLED` di `src/lib/data.ts`).
 - `POST /api/orders` menyimpan `items` sebagai string JSON, karena itu yang dibaca UI.
+- **Nomor WhatsApp adalah kunci pelacakan.** `Order.whatsapp` disimpan ternormalisasi
+  (`0878 8056-8880` dan `6287880568880` disamakan lewat `normalizePhone`). Kolom punya
+  default `""` hanya agar bisa ditambahkan ke tabel berisi data; pencarian menolak nilai
+  kosong.
+- **Pesanan tanpa login**: `userId` bisa `null`. Kalau admin yang menginput, pesanan tidak
+  menempel ke akun admin — dipautkan ke akun pemilik nomor hanya jika akun itu ada.
+- **Pencarian terbuka** `GET /api/orders/lookup?q=`: cocok persis setelah dinormalkan,
+  maksimal 20 hasil. Data pelanggan (`user`) hanya dikirim saat peminta admin.
+- **Halaman Pengeluaran dihapus** dari panel, tapi `Expense` dan `GET/POST /api/expenses`
+  masih ada karena dipakai diagram lingkaran di `/admin/reports`.
 - Ongkos antar jemput: **Rp 0 (gratis)**, diatur lewat `DELIVERY_FEE` di `src/lib/data.ts`.
 - **Tarif per potong** ada di tabel `PriceItem` (60 baris), diketik ulang dari struk cetak
   Rossy. Sumber: `prisma/prices.ts`, masuk lewat `npm run db:seed`, dibaca lewat

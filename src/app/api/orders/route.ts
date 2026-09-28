@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateOrderNumber } from "@/lib/utils";
+import { generateOrderNumber, normalizePhone } from "@/lib/utils";
 import { LAUNDRY_INFO, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
 import { z } from "zod";
 
@@ -15,6 +15,8 @@ const orderSchema = z.object({
     price: z.number().min(0),
   })),
   weight: z.number().optional(),
+  // Wajib untuk semua pesanan, termasuk yang tidak login - inilah kunci pencariannya.
+  whatsapp: z.string().min(1, "Nomor WhatsApp wajib diisi"),
   deliveryType: z.enum(["PICKUP", "DELIVERY"]),
   pickupAddress: z.string().max(300).optional().or(z.literal("").transform(() => undefined)),
   deliveryFee: z.number().default(0),
@@ -35,8 +37,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Login opsional: pesanan tamu sah selama nomor WhatsApp diisi.
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try {
@@ -54,6 +56,14 @@ export async function POST(req: Request) {
     );
   }
   const data = parsed.data;
+
+  const whatsapp = normalizePhone(data.whatsapp);
+  if (!whatsapp) {
+    return NextResponse.json(
+      { error: "Nomor WhatsApp tidak valid. Gunakan format 08xxxxxxxxxx." },
+      { status: 400 }
+    );
+  }
 
   // Ongkos dihitung di server, bukan dari klien.
   const deliveryFee = data.deliveryType === "DELIVERY" ? DELIVERY_FEE : 0;
@@ -104,11 +114,26 @@ export async function POST(req: Request) {
 
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
 
+  // Pelanggan: kaitkan ke akunnya sendiri.
+  // Admin: pesanan ini dibuat atas nama pelanggan lain, jadi jangan menempel ke akun admin -
+  // kaitkan hanya kalau memang ada pemilik nomor yang punya akun.
+  let userId: string | null = null;
+  if (session?.user) {
+    const role = (session.user as { role?: string }).role;
+    if (role === "ADMIN") {
+      const owner = await prisma.user.findFirst({ where: { phone: whatsapp } });
+      userId = owner?.id ?? null;
+    } else {
+      userId = (session.user as { id: string }).id;
+    }
+  }
+
   try {
     const order = await prisma.order.create({
       data: {
         orderNumber: generateOrderNumber(),
-        userId: (session.user as any).id,
+        userId,
+        whatsapp,
         service: data.service,
         washType: data.washType,
         items: JSON.stringify(items),
@@ -118,7 +143,7 @@ export async function POST(req: Request) {
         pickupAddress: data.deliveryType === "DELIVERY" ? data.pickupAddress ?? null : null,
         deliveryFee,
         notes: data.notes,
-        statusLogs: { create: { status: "PENDING", note: "Pesanan dibuat" } },
+        statusLogs: { create: { status: "MENUNGGU", note: "Pesanan dibuat" } },
       },
       include: { statusLogs: true },
     });

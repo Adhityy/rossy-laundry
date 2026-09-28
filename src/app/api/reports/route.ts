@@ -8,7 +8,7 @@ export async function GET() {
   if (!session?.user || role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const orders = await prisma.order.findMany({ where: { status: "COMPLETED" } });
+  const orders = await prisma.order.findMany({ where: { status: "SELESAI" } });
   const expenses = await prisma.expense.findMany();
 
   const totalIncome = orders.reduce((s, o) => s + o.total, 0);
