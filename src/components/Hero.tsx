@@ -35,7 +35,7 @@ export function Hero() {
             {...rise(0.08)}
             className="mt-6 max-w-[46ch] text-base leading-relaxed text-muted-foreground sm:text-lg"
           >
-            Antar jemput Rp 5.000 ke rumah Anda. Harga per kilo tertera di halaman ini,
+            Antar jemput gratis ke rumah Anda. Harga per kilo tertera di halaman ini,
             tanpa biaya tersembunyi.
           </motion.p>
 

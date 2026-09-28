@@ -71,6 +71,7 @@ src/
 ## Catatan pengembangan
 
 - `POST /api/orders` menyimpan `items` sebagai string JSON, karena itu yang dibaca UI.
-- Alamat jemput/antar belum ada di schema maupun form — opsi "antar jemput" saat ini
-  hanya menambah ongkos, penjemputan diatur lewat WhatsApp.
+- Ongkos antar jemput: **Rp 0 (gratis)**, diatur lewat `DELIVERY_FEE` di `src/lib/data.ts`.
+- Alamat jemput/antar belum ada di schema maupun form. Opsi antar jemput hanya memilih
+  cara pengangkutan, penjemputan diatur lewat WhatsApp.
 - Foto di `public/` dari Wikimedia Commons (lihat kredit di footer).

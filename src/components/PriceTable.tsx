@@ -117,7 +117,8 @@ export function PriceTable() {
         <AlertTitle>Syarat pesanan</AlertTitle>
         <AlertDescription>
           Minimal order kiloan {MIN_ORDER_KG} kg. Diskon 10% untuk order di atas 10 kg.
-          Ongkos antar {formatCurrency(DELIVERY_FEE)}. Jam operasional {LAUNDRY_INFO.hours}.
+          Ongkos antar {DELIVERY_FEE > 0 ? formatCurrency(DELIVERY_FEE) : "gratis"}. Jam
+          operasional {LAUNDRY_INFO.hours}.
         </AlertDescription>
       </Alert>
     </section>

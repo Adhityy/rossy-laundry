@@ -111,8 +111,8 @@ export const STATUS_IN_PROGRESS: readonly string[] = ORDER_STATUSES.map((s) => s
   (k) => k !== "COMPLETED"
 );
 
-// Delivery fee
-export const DELIVERY_FEE = 5000;
+// Ongkos antar jemput. 0 = gratis. Tampil di UI sebagai "Gratis", bukan "Rp 0".
+export const DELIVERY_FEE = 0;
 
 // Minimum order kiloan (kg)
 export const MIN_ORDER_KG = 3;

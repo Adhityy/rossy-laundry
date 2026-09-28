@@ -17,7 +17,7 @@ const services = [
   {
     icon: Truck,
     title: "Antar Jemput",
-    desc: "Kami ambil dan antar ke rumah Anda, biaya Rp 5.000.",
+    desc: "Kami ambil dan antar ke rumah Anda tanpa biaya tambahan.",
     cell: "",
     media: "/drying-linen.jpg",
     alt: "Pakaian putih di atas rak jemuran",

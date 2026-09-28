@@ -297,8 +297,8 @@ export default function NewOrderPage() {
                 <span className="flex items-center gap-2 font-medium">
                   <Truck size={16} strokeWidth={1.75} /> Antar jemput
                 </span>
-                <span className="tabular mt-1 block text-sm text-muted-foreground">
-                  +{formatCurrency(DELIVERY_FEE)}
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  {DELIVERY_FEE > 0 ? `+${formatCurrency(DELIVERY_FEE)}` : "Gratis"}
                 </span>
               </span>
             </label>
