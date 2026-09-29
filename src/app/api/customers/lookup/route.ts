@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { normalizePhone } from "@/lib/utils";
+import { phoneVariants } from "@/lib/utils";
 
 /**
  * Ambil nama pemilik nomor WhatsApp - khusus admin, dipakai form pesanan manual.
@@ -17,13 +17,13 @@ export async function GET(req: Request) {
   }
 
   const raw = new URL(req.url).searchParams.get("phone") ?? "";
-  const phone = normalizePhone(raw);
-  if (!phone) {
+  const variants = phoneVariants(raw);
+  if (variants.length === 0) {
     return NextResponse.json({ error: "Nomor tidak valid" }, { status: 400 });
   }
 
   const user = await prisma.user.findFirst({
-    where: { phone },
+    where: { phone: { in: variants } },
     select: { name: true, email: true, address: true, createdAt: true },
   });
 

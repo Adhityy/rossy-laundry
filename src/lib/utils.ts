@@ -45,6 +45,24 @@ export function normalizePhone(raw: string): string {
   return digits;
 }
 
+/**
+ * Semua format yang mungkin untuk satu nomor.
+ *
+ * `User.phone` disimpan apa adanya (081234567890), `Order.whatsapp` disimpan ternormalisasi
+ * (6281234567890). Keduanya harus bisa dicocokkan, jadi kembalikan variasinya sebagai `IN` list.
+ */
+export function phoneVariants(raw: string | null | undefined): string[] {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  if (digits.length < 9 || digits.length > 15) return [];
+
+  const out = new Set<string>([digits]);
+  if (digits.startsWith("0")) out.add(`62${digits.slice(1)}`);
+  else if (digits.startsWith("8")) out.add(`62${digits}`);
+  else if (digits.startsWith("62")) out.add(`0${digits.slice(2)}`);
+
+  return [...out];
+}
+
 /** Tampilan yang enak dibaca: 62 878-8056-8880 */
 export function formatPhone(digits: string): string {
   const d = (digits || "").replace(/\D/g, "");

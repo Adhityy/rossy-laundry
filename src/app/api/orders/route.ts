@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateOrderNumber, normalizePhone } from "@/lib/utils";
+import { generateOrderNumber, normalizePhone, phoneVariants } from "@/lib/utils";
 import { LAUNDRY_INFO, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
 import { z } from "zod";
 
@@ -38,10 +38,15 @@ export async function GET() {
     select: { phone: true },
   });
   const phone = normalizePhone(profile?.phone ?? "");
+  const variants = phoneVariants(profile?.phone ?? "");
 
   const orders = await prisma.order.findMany({
     where: {
-      OR: [{ userId: me }, ...(phone ? [{ whatsapp: phone }] : [])],
+      OR: [
+        { userId: me },
+        ...(phone ? [{ whatsapp: phone }] : []),
+        ...variants.map((v) => ({ whatsapp: v })),
+      ],
     },
     orderBy: { createdAt: "desc" },
     include: { statusLogs: { orderBy: { createdAt: "desc" } } },
@@ -135,7 +140,11 @@ export async function POST(req: Request) {
   if (session?.user) {
     const role = (session.user as { role?: string }).role;
     if (role === "ADMIN") {
-      const owner = await prisma.user.findFirst({ where: { phone: whatsapp } });
+      // User.phone disimpan apa adanya (0812...), jadi cocokkan semua variasi format.
+      const variants = phoneVariants(whatsapp);
+      const owner = variants.length
+        ? await prisma.user.findFirst({ where: { phone: { in: variants } } })
+        : null;
       userId = owner?.id ?? null;
     } else {
       userId = (session.user as { id: string }).id;
