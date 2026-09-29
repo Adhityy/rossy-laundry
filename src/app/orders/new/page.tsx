@@ -90,13 +90,23 @@ export default function NewOrderPage() {
     const t = window.setTimeout(() => {
       fetch(`/api/customers/lookup?phone=${encodeURIComponent(whatsapp)}`)
         .then((r) => (r.ok ? r.json() : { found: false }))
-        .then((d: { found?: boolean; name?: string; email?: string; address?: string | null }) => {
+        .then((d: { found?: boolean; name?: string; email?: string | null; source?: string; detail?: string | null }) => {
           if (!alive) return;
           if (d.found && d.name) {
-            setNameHint(`Ditemukan: ${d.name}${d.email ? ` (${d.email})` : ""}`);
+            const asal =
+              d.source === "catatan"
+                ? ", dari catatan sebelumnya"
+                : d.source === "osint"
+                  ? ", lewat OSINT"
+                  : "";
+            setNameHint(`Ditemukan: ${d.name}${asal}`);
             setCustomerName((prev) => prev || d.name || "");
           } else {
-            setNameHint("Nomor ini belum terdaftar. Isi nama pelanggan di bawah.");
+            setNameHint(
+              d.detail
+                ? `Belum ketemu (${d.detail}). Isi nama pelanggan di bawah.`
+                : "Belum ketemu di catatan maupun OSINT. Isi nama pelanggan di bawah."
+            );
           }
         })
         .catch(() => {

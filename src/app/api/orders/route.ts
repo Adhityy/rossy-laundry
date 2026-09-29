@@ -137,9 +137,11 @@ export async function POST(req: Request) {
   // Admin: pesanan ini dibuat atas nama pelanggan lain, jadi jangan menempel ke akun admin -
   // kaitkan hanya kalau memang ada pemilik nomor yang punya akun.
   let userId: string | null = null;
+  let isAdminEntry = false;
   if (session?.user) {
     const role = (session.user as { role?: string }).role;
     if (role === "ADMIN") {
+      isAdminEntry = true;
       // User.phone disimpan apa adanya (0812...), jadi cocokkan semua variasi format.
       const variants = phoneVariants(whatsapp);
       const owner = variants.length
@@ -171,6 +173,19 @@ export async function POST(req: Request) {
       },
       include: { statusLogs: true },
     });
+
+    // Simpan nama per nomor: pelanggan datang langsung biasanya tidak punya akun,
+    // jadi tanpa catatan ini nama yang sama harus diketik ulang setiap datang.
+    const givenName = data.customerName?.trim();
+    if (isAdminEntry && givenName) {
+      await prisma.contact
+        .upsert({
+          where: { phone: whatsapp },
+          update: { name: givenName },
+          create: { phone: whatsapp, name: givenName },
+        })
+        .catch(() => undefined);
+    }
 
     return NextResponse.json(order, { status: 201 });
   } catch {

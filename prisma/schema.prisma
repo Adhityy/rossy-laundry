@@ -56,6 +56,15 @@ model Order {
   @@index([userId])
 }
 
+// Nama per nomor yang pernah diinput admin saat pesanan datang langsung.
+// Pelanggan lansia tidak punya akun, jadi tanpa catatan ini admin harus mengetik ulang
+// nama orang yang sama setiap kali datang. Kunci: nomor, dalam format ternormalisasi.
+model Contact {
+  phone     String   @id
+  name      String
+  updatedAt DateTime @updatedAt
+}
+
 // Satu ulasan per pesanan, hanya bisa dibuat setelah status SELESAI.
 // orderId dibuat nullable + SetNull supaya ulasan tetap tersimpan walau pesanannya
 // dihapus (misal saat membersihkan data uji).
