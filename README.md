@@ -1,4 +1,4 @@
-# Rossy Laundry
+# Laundry Rossy
 
 Sistem manajemen laundry: situs publik, pemesanan pelanggan, dan panel admin.
 
