@@ -371,10 +371,12 @@ export default function NewOrderPage() {
       {manual && (
         <Alert>
           <Info size={16} />
-          <AlertTitle>Pesanan manual atas nama pelanggan</AlertTitle>
+          <AlertTitle>Pesanan untuk pelanggan yang datang langsung</AlertTitle>
           <AlertDescription>
-            Isi nomor WhatsApp pelanggan di bawah, bukan nomor Anda. Pelanggan memakai nomor
-            itulah untuk mengecek pesanan nanti.
+            Dipakai untuk pelanggan yang belum terbiasa memesan lewat web, misalnya orang tua
+            yang antar sendiri ke toko. Isi nomor WhatsApp mereka, bukan nomor Anda. Nama
+            dicari dari akun terdaftar; kalau belum ada, ketik sendiri. Pesanan ini menjadi
+            milik nomor yang Anda isi, bukan milik akun Anda.
           </AlertDescription>
         </Alert>
       )}
