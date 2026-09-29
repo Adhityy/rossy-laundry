@@ -18,7 +18,7 @@ type Ctx = { params: Promise<{ id: string }> };
 async function authorize(id: string, phoneHint?: string) {
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { statusLogs: { orderBy: { createdAt: "asc" } } },
+    include: { statusLogs: { orderBy: { createdAt: "asc" } }, review: true },
   });
   if (!order) return { kind: "not_found" as const };
 
@@ -70,6 +70,8 @@ export async function GET(req: Request, { params }: Ctx) {
     notes: o.notes,
     createdAt: o.createdAt,
     statusLogs: o.statusLogs,
+    review: o.review,
+    customerName: o.customerName,
   };
 
   // Data pelanggan hanya untuk admin.

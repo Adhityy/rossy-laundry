@@ -1,6 +1,7 @@
 import { Hero } from "@/components/Hero";
 import { ServicesSection } from "@/components/ServicesSection";
 import { Features } from "@/components/Features";
+import { ReviewSlider } from "@/components/ReviewSlider";
 import { PriceTable } from "@/components/PriceTable";
 import { ContactCta } from "@/components/ContactCta";
 import { Footer } from "@/components/Footer";
@@ -14,6 +15,8 @@ export default function HomePage() {
       <Hero />
       <ServicesSection />
       <Features />
+      {/* Ulasan pelanggan, tepat di atas daftar harga. Tidak dirender kalau belum ada ulasan. */}
+      <ReviewSlider />
       <PriceTable />
       <ContactCta />
       <Footer />

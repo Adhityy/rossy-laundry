@@ -14,18 +14,20 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { statusLabel, StatusBadge } from "@/components/StatusBadge";
-import { ORDER_STATUSES, STATUS_IN_PROGRESS, SERVICE_AREA, STATUS_CANCELLED } from "@/lib/data";
+import { StatusBadge } from "@/components/StatusBadge";
+import { ORDER_STATUSES, STATUS_IN_PROGRESS, SERVICE_AREA } from "@/lib/data";
 
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { Order } from "@/lib/types";
+
+/**
+ * Tahap berikutnya saja. Admin tidak bisa memilih bebas - mundur maupun melompat
+ * ditolak di server, dan di sini tidak ditawarkan.
+ */
+function nextOf(status: string) {
+  const i = ORDER_STATUSES.findIndex((s) => s.key === status);
+  return i >= 0 ? ORDER_STATUSES[i + 1] : undefined;
+}
 
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -151,7 +153,9 @@ export default function AdminDashboard() {
                         </span>
                       </div>
 
-                      <div className="mt-1.5 font-medium">{o.user?.name || "-"}</div>
+                      <div className="mt-1.5 font-medium">
+                        {o.customerName || o.user?.name || "Tanpa nama"}
+                      </div>
                       {o.pickupAddress && (
                         <div className="mt-1 truncate text-xs text-muted-foreground">
                           Jemput: {o.pickupAddress}
@@ -162,28 +166,19 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="mt-3 flex items-center justify-between gap-3">
-                        {o.status === STATUS_CANCELLED ? (
-                          <StatusBadge status={o.status} />
-                        ) : (
-                          <Select
-                            value={o.status}
-                            onValueChange={(v) => changeStatus(o.id, v)}
+                        {nextOf(o.status) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
                             disabled={savingId === o.id}
+                            onClick={() => changeStatus(o.id, nextOf(o.status)!.key)}
                           >
-                            <SelectTrigger
-                              className="h-9 w-[150px] text-xs"
-                              aria-label="Ubah status"
-                            >
-                              <SelectValue placeholder={statusLabel(o.status)} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ORDER_STATUSES.map((s) => (
-                                <SelectItem key={s.key} value={s.key}>
-                                  {s.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            {savingId === o.id
+                              ? "Menyimpan..."
+                              : `Lanjut ke ${nextOf(o.status)!.label}`}
+                          </Button>
+                        ) : (
+                          <StatusBadge status={o.status} />
                         )}
                         <Link
                           href={`/orders/${o.id}`}
@@ -220,7 +215,7 @@ export default function AdminDashboard() {
                       <TableRow key={o.id}>
                         <TableCell className="tabular text-xs">{o.orderNumber}</TableCell>
                         <TableCell>
-                          <div>{o.user?.name || "-"}</div>
+                          <div>{o.customerName || o.user?.name || "Tanpa nama"}</div>
                           {o.pickupAddress && (
                             <div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground">
                               Jemput: {o.pickupAddress}
@@ -231,28 +226,19 @@ export default function AdminDashboard() {
                           {formatDateTime(o.createdAt)}
                         </TableCell>
                         <TableCell>
-                          {o.status === STATUS_CANCELLED ? (
-                            <StatusBadge status={o.status} />
-                          ) : (
-                            <Select
-                              value={o.status}
-                              onValueChange={(v) => changeStatus(o.id, v)}
+                          {nextOf(o.status) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
                               disabled={savingId === o.id}
+                              onClick={() => changeStatus(o.id, nextOf(o.status)!.key)}
                             >
-                              <SelectTrigger
-                                className="h-8 w-[150px] text-xs"
-                                aria-label="Ubah status"
-                              >
-                                <SelectValue placeholder={statusLabel(o.status)} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ORDER_STATUSES.map((s) => (
-                                  <SelectItem key={s.key} value={s.key}>
-                                    {s.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {savingId === o.id
+                                ? "Menyimpan..."
+                                : `Lanjut ke ${nextOf(o.status)!.label}`}
+                            </Button>
+                          ) : (
+                            <StatusBadge status={o.status} />
                           )}
                         </TableCell>
                         <TableCell className="tabular text-right font-medium">

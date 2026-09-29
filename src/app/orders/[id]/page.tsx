@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Check, Info, UserRound } from "lucide-react";
+import { ArrowLeft, Ban, Check, Info, Star, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StrukDialog } from "@/components/StrukDialog";
 import { StatusBadge, statusLabel, statusStep } from "@/components/StatusBadge";
 import { ORDER_STATUSES, STATUS_CANCELLED, TOTAL_STEPS } from "@/lib/data";
 import { formatCurrency, formatDateTime, formatPhone } from "@/lib/utils";
@@ -70,6 +72,12 @@ export default function TrackingPage() {
   const [ready, setReady] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
+
+  // Penilaian - hanya muncul setelah status SELESAI.
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [reviewName, setReviewName] = useState("");
+  const [reviewing, setReviewing] = useState(false);
   const { data: session } = useSession();
   const isAdmin =
     (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
@@ -128,6 +136,50 @@ export default function TrackingPage() {
       toast.error("Tidak bisa terhubung ke server.");
     } finally {
       setCancelling(false);
+    }
+  }
+
+  // Pratinjau nama pengulas, hanya sekali saat pesanan pertama terbaca.
+  useEffect(() => {
+    if (!order || "error" in order) return;
+    const pre = order.customerName || order.user?.name || "";
+    setReviewName((prev) => prev || pre);
+  }, [order]);
+
+  async function submitReview() {
+    if (rating < 1) {
+      toast.error("Pilih jumlah bintang dulu.");
+      return;
+    }
+    if (comment.trim().length < 3) {
+      toast.error("Tulis ulasan minimal 3 karakter.");
+      return;
+    }
+    setReviewing(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating,
+          comment: comment.trim(),
+          name: reviewName.trim() || undefined,
+          phone: phone || undefined,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.error(data.error || "Gagal mengirim penilaian.");
+        return;
+      }
+      toast.success("Terima kasih atas penilaian Anda.");
+      setRating(0);
+      setComment("");
+      await load();
+    } catch {
+      toast.error("Tidak bisa terhubung ke server.");
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -201,6 +253,10 @@ export default function TrackingPage() {
             {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
           </p>
 
+          <div className="flex flex-wrap gap-2">
+            <StrukDialog order={order} />
+          </div>
+
           <p className="text-sm text-muted-foreground">
             WhatsApp
             <span className="tabular ml-2 text-foreground">{formatPhone(order.whatsapp)}</span>
@@ -265,14 +321,14 @@ export default function TrackingPage() {
                 Telepon akun
               </p>
               <p className="tabular mt-1 text-sm">
-                {order.user.phone ? formatPhone(order.user.phone) : "—"}
+                {order.user.phone ? formatPhone(order.user.phone) : "-"}
               </p>
             </div>
             <div className="sm:col-span-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Alamat akun
               </p>
-              <p className="mt-1 text-sm">{order.user.address || "—"}</p>
+              <p className="mt-1 text-sm">{order.user.address || "-"}</p>
             </div>
           </CardContent>
         </Card>
@@ -340,6 +396,104 @@ export default function TrackingPage() {
           )}
         </CardContent>
       </Card>
+
+      {order.status === "SELESAI" && !order.review && (
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Star size={16} strokeWidth={1.75} /> Beri penilaian
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Pesanan sudah selesai. Penilaian Anda tampil di halaman beranda.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-1">
+              {[1, 2, 3, 4, 5].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-label={`${v} dari 5 bintang`}
+                  aria-pressed={rating === v}
+                  onClick={() => setRating(v)}
+                  className="rounded p-1 transition-colors hover:bg-accent"
+                >
+                  <Star
+                    size={26}
+                    strokeWidth={1.5}
+                    className={
+                      v <= rating
+                        ? "fill-primary text-primary"
+                        : "text-muted-foreground"
+                    }
+                  />
+                </button>
+              ))}
+              <span className="ml-2 text-sm text-muted-foreground">
+                {rating > 0 ? `${rating} dari 5` : "Belum dipilih"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rv-name">Nama (tampil di beranda)</Label>
+              <Input
+                id="rv-name"
+                value={reviewName}
+                maxLength={40}
+                onChange={(e) => setReviewName(e.target.value)}
+                placeholder="Nama Anda"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rv-comment">Ulasan</Label>
+              <Textarea
+                id="rv-comment"
+                rows={3}
+                className="resize-none"
+                value={comment}
+                maxLength={500}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Bagaimana hasil cucian dan pelayanannya?"
+              />
+              <p className="text-xs text-muted-foreground">{comment.length}/500</p>
+            </div>
+
+            <Button
+              onClick={submitReview}
+              disabled={reviewing || rating < 1 || comment.trim().length < 3}
+            >
+              {reviewing ? "Mengirim..." : "Kirim penilaian"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {order.review && (
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="text-base">Penilaian Anda</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex gap-0.5" aria-label={`${order.review.rating} dari 5 bintang`}>
+              {[1, 2, 3, 4, 5].map((v) => (
+                <Star
+                  key={v}
+                  size={17}
+                  strokeWidth={1.5}
+                  className={
+                    v <= order.review!.rating ? "fill-primary text-primary" : "text-muted-foreground"
+                  }
+                />
+              ))}
+            </div>
+            <p className="text-sm">{order.review.comment}</p>
+            <p className="text-xs text-muted-foreground">
+              {order.review.name} · {formatDateTime(order.review.createdAt)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {canCancel && (
         <Card className="border-destructive/40">

@@ -44,12 +44,31 @@ model Order {
   weight       Float?
   total        Float           @default(0)
   notes        String?
+  // Nama pelanggan untuk pesanan manual / pesanan tamu. Kalau nomor terdaftar,
+  // nama bisa diambil dari User dan disimpan di sini.
+  customerName String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   statusLogs   OrderStatusLog[]
+  review       Review?
 
   @@index([whatsapp])
   @@index([userId])
+}
+
+// Satu ulasan per pesanan, hanya bisa dibuat setelah status SELESAI.
+// orderId dibuat nullable + SetNull supaya ulasan tetap tersimpan walau pesanannya
+// dihapus (misal saat membersihkan data uji).
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String?  @unique
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  name      String
+  rating    Int // 1..5
+  comment   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model OrderStatusLog {

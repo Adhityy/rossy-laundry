@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
  *
  * Photon (komoot, open source, berbasis OpenStreetMap) dipakai sebagai default karena
  * gratis tanpa API key. Demo server-nya tidak menjanjikan SLA dan akan men-throttle
- * pemakaian berat — cukup untuk kebutuhan alamat jemput sebuah laundry.
+ * pemakaian berat, cukup untuk kebutuhan alamat jemput sebuah laundry.
  *
  * Untuk kualitas alamat Indonesia yang lebih lengkap, ganti ke Google:
  *   set GOOGLE_MAPS_API_KEY, lalu pakai Geocoding API

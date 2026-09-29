@@ -31,10 +31,21 @@ export type Order = {
   weight: number | null;
   total: number;
   notes: string | null;
+  customerName?: string | null;
+  review?: Review | null;
   createdAt: string;
   updatedAt: string;
   statusLogs?: OrderStatusLog[];
   user?: { name: string; email: string; phone: string | null };
+};
+
+export type Review = {
+  id: string;
+  orderId: string | null;
+  name: string;
+  rating: number; // 1..5
+  comment: string;
+  createdAt: string;
 };
 
 export type PriceItem = {

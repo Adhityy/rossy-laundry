@@ -21,6 +21,8 @@ const orderSchema = z.object({
   pickupAddress: z.string().max(300).optional().or(z.literal("").transform(() => undefined)),
   deliveryFee: z.number().default(0),
   notes: z.string().optional(),
+  // Nama pelanggan - diisi admin pada mode manual, atau dari profil pelanggan.
+  customerName: z.string().trim().max(80).optional(),
 });
 
 export async function GET() {
@@ -155,6 +157,7 @@ export async function POST(req: Request) {
         pickupAddress: data.deliveryType === "DELIVERY" ? data.pickupAddress ?? null : null,
         deliveryFee,
         notes: data.notes,
+        customerName: data.customerName || null,
         statusLogs: { create: { status: "MENUNGGU", note: "Pesanan dibuat" } },
       },
       include: { statusLogs: true },

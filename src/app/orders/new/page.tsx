@@ -48,6 +48,9 @@ export default function NewOrderPage() {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [query, setQuery] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  // Mode manual: nama diambil dari akun pemilik nomor, bisa disunting admin.
+  const [customerName, setCustomerName] = useState("");
+  const [nameHint, setNameHint] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [prices, setPrices] = useState<PriceItem[]>([]);
   const [pricesLoading, setPricesLoading] = useState(true);
@@ -76,6 +79,35 @@ export default function NewOrderPage() {
   useEffect(() => {
     setManual(new URLSearchParams(window.location.search).get("manual") === "1");
   }, []);
+
+  // Mode manual: begitu nomor berhenti diketik, cari nama pemiliknya.
+  useEffect(() => {
+    if (!manual || whatsapp.replace(/\D/g, "").length < 10) {
+      setNameHint(null);
+      return;
+    }
+    let alive = true;
+    const t = window.setTimeout(() => {
+      fetch(`/api/customers/lookup?phone=${encodeURIComponent(whatsapp)}`)
+        .then((r) => (r.ok ? r.json() : { found: false }))
+        .then((d: { found?: boolean; name?: string; email?: string; address?: string | null }) => {
+          if (!alive) return;
+          if (d.found && d.name) {
+            setNameHint(`Ditemukan: ${d.name}${d.email ? ` (${d.email})` : ""}`);
+            setCustomerName((prev) => prev || d.name || "");
+          } else {
+            setNameHint("Nomor ini belum terdaftar. Isi nama pelanggan di bawah.");
+          }
+        })
+        .catch(() => {
+          if (alive) setNameHint(null);
+        });
+    }, 450);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+  }, [manual, whatsapp]);
 
   useEffect(() => {
     let alive = true;
@@ -293,6 +325,7 @@ export default function NewOrderPage() {
           pickupAddress: delivery === "DELIVERY" ? pickupAddress.trim() : undefined,
           deliveryFee,
           notes: notes || undefined,
+          customerName: manual ? customerName.trim() || undefined : undefined,
         }),
       });
 
@@ -598,6 +631,32 @@ export default function NewOrderPage() {
                 ? "Terisi otomatis dari profil, boleh diganti."
                 : "Wajib diisi. Dengan nomor ini Anda bisa cek pesanan tanpa masuk akun."}
           </p>
+
+          {manual && (
+            <div className="mt-3 space-y-2 border-t border-border pt-3">
+              <Label htmlFor="o-name">Nama pelanggan</Label>
+              <Input
+                id="o-name"
+                value={customerName}
+                maxLength={80}
+                placeholder="Dicari otomatis dari nomor, boleh disunting"
+                onChange={(e) => setCustomerName(e.target.value)}
+              />
+              {nameHint && (
+                <p
+                  role="status"
+                  className={[
+                    "text-xs",
+                    nameHint.startsWith("Ditemukan")
+                      ? "text-primary"
+                      : "text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {nameHint}
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
