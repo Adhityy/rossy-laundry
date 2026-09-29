@@ -10,9 +10,10 @@
  *   sumithemmadi/truecallerpy
  *   saqibsarwar12/truecaller-api   (Cloudflare Worker, bentuk request sama)
  *
- * Butuh TRUECALLER_TOKEN (installationId). Token didapat sekali lewat alur OTP Truecaller;
- * lihat script/get-truecaller-token.mjs dan README. Tanpa token fungsi ini diam-diam batal,
- * bukan error.
+ * Butuh TRUECALLER_TOKEN (installationId) yang didapat dari luar: instal Truecaller asli di
+ * HP Android, onboarding normal, lalu ambil dari SharedPreferences app (butuh root/ADB).
+ * Alur OTP dari server sudah mati sejak ~2025 karena di-gate Play Integrity, jadi script
+ * sekali-jalan tidak ada gunanya lagi. Tanpa token fungsi ini diam-diam batal, bukan error.
  */
 
 export type OsintHit = {

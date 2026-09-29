@@ -112,7 +112,17 @@ src/
 
   Hasil OSINT langsung disimpan ke `Contact`, jadi hitungan berikutnya instan dan kuota
   pencarian tidak terbuang. Tanpa `TRUECALLER_TOKEN`, langkah ketiga diam-diam dibuang dan
-  form hanya menampilkan `detail` kenapa tidak ketemu. Cara dapat token: `script/get-truecaller-token.mjs`.
+  form hanya menampilkan `detail` kenapa tidak ketemu.
+
+  **Kenapa token bukan dari script sendiri:** alur OTP onboarding Truecaller
+  (`/v2/sendOnboardingOtp`) sudah mati sejak ~2025 karena di-gate Play Integrity /
+  SafetyNet, jadi device-spoof JSON tidak cukup. Semua library rilis 2023
+  (`truecallerjs`, `truecallerpy`) gagal dengan `20003 Verification failed`. Riset status
+  per April 2026: `AnshumanAtrey/clank/research/03-truecaller-methods.md`. Satu-satunya
+  sumber `installationId` yang masih valid adalah onboarding Truecaller asli di HP Android,
+  lalu baca SharedPreferences app-nya (butuh root atau ADB `run-as`).
+  Endpoints pencarinya sendiri (`/v2/search`, `/v2/bulk` 30 nomor) masih respons normal
+  selama token-nya sah.
 - **Nomor WhatsApp adalah kunci pelacakan.** `Order.whatsapp` disimpan ternormalisasi
   (`0878 8056-8880` dan `6287880568880` disamakan lewat `normalizePhone`). Kolom punya
   default `""` hanya agar bisa ditambahkan ke tabel berisi data; pencarian menolak nilai
