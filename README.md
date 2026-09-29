@@ -104,7 +104,15 @@ src/
 - **Tahapan status ada 4**: `MENUNGGU`, `DIPROSES`, `SIAP_DIAMBIL`, `SELESAI`, plus
   `DIBATALKAN` sebagai status terminal di luar tahapan (`ORDER_STATUSES` dan
   `STATUS_CANCELLED` di `src/lib/data.ts`).
-- `POST /api/orders` menyimpan `items` sebagai string JSON, karena itu yang dibaca UI.
+- **Pencarian nama pemilik nomor (OSINT)** hanya jalan di jalur pesanan datang langsung,
+  dan hanya untuk sesi admin. Urutan sumbernya `akun` -> `catatan` -> `osint`:
+  1. `User` yang nomornya cocok,
+  2. tabel `Contact` (nama yang pernah admin input),
+  3. Truecaller lewat `src/lib/osint.ts` (`search5-noneu.truecaller.com/v2/search`).
+
+  Hasil OSINT langsung disimpan ke `Contact`, jadi hitungan berikutnya instan dan kuota
+  pencarian tidak terbuang. Tanpa `TRUECALLER_TOKEN`, langkah ketiga diam-diam dibuang dan
+  form hanya menampilkan `detail` kenapa tidak ketemu. Cara dapat token: `script/get-truecaller-token.mjs`.
 - **Nomor WhatsApp adalah kunci pelacakan.** `Order.whatsapp` disimpan ternormalisasi
   (`0878 8056-8880` dan `6287880568880` disamakan lewat `normalizePhone`). Kolom punya
   default `""` hanya agar bisa ditambahkan ke tabel berisi data; pencarian menolak nilai
