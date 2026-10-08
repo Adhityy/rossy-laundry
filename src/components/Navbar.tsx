@@ -4,8 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useSession } from "next-auth/react";
-import { Menu, X, Sun, Moon, Shirt, ArrowRight, UserRound } from "lucide-react";
-import { useTheme } from "@/components/ThemeProvider";
+import { Menu, X, Shirt, ArrowRight, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const links = [
@@ -21,35 +20,6 @@ const adminLinks = [
   { href: "/admin/prices", label: "Harga" },
   { href: "/admin/reports", label: "Laporan" },
 ];
-
-export function ThemeToggle({ className }: { className?: string }) {
-  const { theme, toggle } = useTheme();
-  const reduce = useReducedMotion();
-  const isDark = theme === "dark";
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={isDark ? "Aktifkan mode terang" : "Aktifkan mode gelap"}
-      aria-pressed={isDark}
-      className={
-        "grid size-9 place-items-center rounded-md text-muted-foreground transition-colors " +
-        "hover:bg-accent hover:text-foreground focus-visible:outline-none " +
-        "focus-visible:ring-[3px] focus-visible:ring-ring/50 " +
-        (className ?? "")
-      }
-    >
-      <motion.span
-        animate={reduce ? undefined : { rotate: isDark ? 0 : 180, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        className="grid place-items-center"
-      >
-        {isDark ? <Sun size={17} strokeWidth={1.75} /> : <Moon size={17} strokeWidth={1.75} />}
-      </motion.span>
-    </button>
-  );
-}
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -75,7 +45,6 @@ export function Navbar() {
         : "text-muted-foreground hover:bg-accent hover:text-foreground",
     ].join(" ");
 
-  // Menu dengan tanda "#" tidak pernah aktif (karena hanya scroll ke section).
   const isActive = (href: string) => {
     if (href.includes("#")) return false;
     if (href === "/") return pathname === "/";
@@ -104,7 +73,6 @@ export function Navbar() {
 
         {/* Aksi kanan — selalu di kanan */}
         <div className="flex items-center gap-1.5">
-          <ThemeToggle />
           <Button
             asChild
             variant={accountPrimary ? "default" : "outline"}
