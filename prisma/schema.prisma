@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Runtime queries lewat pooler (serverless).
+  url       = env("DATABASE_URL")
+  // prisma db push / migrate harus lewat koneksi langsung, bukan pooler.
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String? // nomor WhatsApp aktif
+  address   String?
+  avatar    String? // data URL (serverless tidak bisa menulis file ke disk)
+  password  String
+  role      String   @default("CUSTOMER") // CUSTOMER | ADMIN
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Order {
+  id           String    @id @default(cuid())
+  userId       String? // null = pesanan tamu atau input manual admin
+  user         User?     @relation(fields: [userId], references: [id])
+  orderNumber  String    @unique
+  // Kunci pencarian pelanggan: isi nomor WhatsApp, format digit saja.
+  // Default "" hanya supaya kolom bisa ditambahkan ke tabel yang sudah berisi baris;
+  // API selalu mengisi nilai ternormalisasi dan pencarian menolak nilai kosong.
+  whatsapp     String    @default("")
+  service      String // KILOAN | SATUAN
+  washType     String          @default("LAUNDRY") // LAUNDRY | DRY_CLEAN (kolom tarif di struk)
+  status       String          @default("MENUNGGU") // see ORDER_STATUSES in lib/data.ts
+  cancelReason String? // diisi saat pembatalan
+  cancelledAt  DateTime?
+  deliveryType String // PICKUP | DELIVERY
+  pickupAddress String? // isi pelanggan saat antar jemput, boleh diedit manual
+  deliveryFee  Float           @default(0)
+  items        String          @default("[]") // JSON: [{ name, qty, price }]
+  weight       Float?
+  total        Float           @default(0)
+  notes        String?
+  // Nama pelanggan untuk pesanan manual / pesanan tamu. Kalau nomor terdaftar,
+  // nama bisa diambil dari User dan disimpan di sini.
+  customerName String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  statusLogs   OrderStatusLog[]
+  review       Review?
+
+  @@index([whatsapp])
+  @@index([userId])
+}
+
+// Nama per nomor yang pernah diinput admin saat pesanan datang langsung.
+// Pelanggan lansia tidak punya akun, jadi tanpa catatan ini admin harus mengetik ulang
+// nama orang yang sama setiap kali datang. Kunci: nomor, dalam format ternormalisasi.
+model Contact {
+  phone     String   @id
+  name      String
+  updatedAt DateTime @updatedAt
+}
+
+// Satu ulasan per pesanan, hanya bisa dibuat setelah status SELESAI.
+// orderId dibuat nullable + SetNull supaya ulasan tetap tersimpan walau pesanannya
+// dihapus (misal saat membersihkan data uji).
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String?  @unique
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  name      String
+  rating    Int // 1..5
+  comment   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model OrderStatusLog {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  category    String   @default("OPERASIONAL") // OPERASIONAL|BAHAN|GAJI|LAINNYA
+  date        DateTime @default(now())
+}
+
+// Daftar tarif dari struk cetak Rossy. Harga per potong.
+// null = sel tarif memang kosong di struk (Karpet, Kasur Lantai) -> tidak bisa dipesan online.
+model PriceItem {
+  id            String   @id @default(cuid())
+  category      String // PAKAIAN | RUMAH_TANGGA (tabel kiri / kanan di struk)
+  name          String
+  laundryPrice  Int?
+  dryCleanPrice Int?
+  note          String?
+  sortOrder     Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([category, name])
+  @@index([category, sortOrder])
+}

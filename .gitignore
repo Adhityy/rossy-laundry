@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+*.db
+*.db-journal
+.vercel
+.env*
+
+# build artifacts
+*.tsbuildinfo
+
+.vercel

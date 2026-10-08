@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Class-based dark mode: ThemeProvider toggles .dark on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Token set: zinc neutrals (one family, locked) + teal as the single accent.
+  Contrast checked: primary light 5.27:1 vs #fafafa, primary dark 10.7:1 vs #09090b.
+  Radius is a single scale: every surface and control uses it.
+*/
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --card: #fafafa;
+  --card-foreground: #18181b;
+  --popover: #fafafa;
+  --popover-foreground: #18181b;
+  --primary: #2563EB;
+  --primary-foreground: #fafafa;
+  --secondary: #e4e4e7;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #2563EB;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #2563EB;
+  --primary-foreground: #09090b;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #f4f4f5;
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+  --border: #27272a;
+  --input: #3f3f46;
+  --ring: #2563EB;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numbers read as data: order IDs and prices get the mono stack. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+}
+
+/* ---------- Struk ---------- */
+
+/* Kertas selalu terang, bahkan saat tema gelap. */
+.struk {
+  color-scheme: light;
+}
+
+/*
+ * Cetak struk. Halaman berangkat dari class `printing-struk` di <html>
+ * (dipasang sementara oleh komponen Struk sebelum window.print()), jadi tidak ada
+ * selektor struktural yang gampang patah kalau susunan layout berubah.
+ */
+@media print {
+  @page {
+    size: A5;
+    margin: 8mm;
+  }
+
+  html.printing-struk body * {
+    visibility: hidden !important;
+  }
+
+  html.printing-struk #struk,
+  html.printing-struk #struk * {
+    visibility: visible !important;
+  }
+
+  html.printing-struk #struk {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
