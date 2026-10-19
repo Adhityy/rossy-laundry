@@ -1,15 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import type { PriceItem } from "@/lib/types";
 
@@ -23,8 +17,10 @@ function Price({ value }: { value: number | null }) {
   return <span className="tabular">{formatCurrency(value)}</span>;
 }
 
-/** Tab kategori + tabel tarif. Data diserver component, komponen ini cuma interaksi. */
 export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; initialCategory?: string }) {
+  // PENGAMAN: Kalau data dari database kosong/gagal load, jangan render apa-apa
+  if (!items || !Array.isArray(items)) return null; 
+
   const grouped = useMemo(() => {
     const map = new Map<string, PriceItem[]>();
     for (const p of items) {
@@ -48,7 +44,12 @@ export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; init
   }
 
   return (
-    <div id="harga" className="scroll-mt-20">
+    <motion.div 
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
       <Tabs value={active} onValueChange={setActive}>
         <TabsList>
           {grouped.map(([category, list]) => (
@@ -60,12 +61,7 @@ export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; init
         </TabsList>
 
         {grouped.map(([category, list]) => (
-          <TabsContent
-            key={category}
-            value={category}
-            forceMount
-            className="mt-4 data-[state=inactive]:hidden"
-          >
+          <TabsContent key={category} value={category} forceMount className="mt-4 data-[state=inactive]:hidden">
             <div className="max-h-[420px] overflow-y-auto rounded-xl border border-border bg-card">
               <Table>
                 <TableHeader>
@@ -79,12 +75,8 @@ export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; init
                   {list.map((item) => (
                     <TableRow key={item.id} title={item.note ?? undefined}>
                       <TableCell className="text-sm">{item.name}</TableCell>
-                      <TableCell className="text-right text-sm">
-                        <Price value={item.laundryPrice} />
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        <Price value={item.dryCleanPrice} />
-                      </TableCell>
+                      <TableCell className="text-right text-sm"><Price value={item.laundryPrice} /></TableCell>
+                      <TableCell className="text-right text-sm"><Price value={item.dryCleanPrice} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -93,6 +85,6 @@ export function PriceTabs({ items, initialCategory }: { items: PriceItem[]; init
           </TabsContent>
         ))}
       </Tabs>
-    </div>
+    </motion.div>
   );
 }

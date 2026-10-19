@@ -5,7 +5,6 @@ import { LAUNDRY_INFO, DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
 import { formatCurrency } from "@/lib/utils";
 import { PriceTabs } from "@/components/PriceTabs";
 
-// Server component: tarif ikut ter-render di HTML, bukan baru muncul setelah JS jalan.
 export async function PriceTable() {
   const prices = await prisma.priceItem.findMany({
     where: { active: true },
@@ -21,7 +20,7 @@ export async function PriceTable() {
   });
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-28">
+    <section id="harga" className="mx-auto max-w-7xl scroll-mt-0 px-4 py-20 sm:px-6 lg:py-28">
       <div className="max-w-[62ch]">
         <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daftar harga</h2>
         <p className="mt-4 text-base leading-relaxed text-muted-foreground">

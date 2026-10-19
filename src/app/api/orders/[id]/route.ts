@@ -5,16 +5,15 @@ import { normalizePhone } from "@/lib/utils";
 import { STATUS_CANCELLED } from "@/lib/data";
 import { z } from "zod";
 
-const cancelSchema = z.object({
-  action: z.literal("cancel"),
+// Perbarui schema agar bisa menerima action "cancel" atau "pay"
+const actionSchema = z.object({
+  action: z.enum(["cancel", "pay"]),
   reason: z.string().trim().max(300).optional(),
-  /** Dipakai penampil tamu: cocokkan dengan nomor WhatsApp pada pesanan. */
   phone: z.string().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Siapa yang boleh melihat/menyentuh pesanan ini, dan seberapa jauh. */
 async function authorize(id: string, phoneHint?: string) {
   const order = await prisma.order.findUnique({
     where: { id },
@@ -29,7 +28,6 @@ async function authorize(id: string, phoneHint?: string) {
   if (role === "ADMIN") return { kind: "admin" as const, order };
   if (userId && order.userId === userId) return { kind: "owner" as const, order };
 
-  // Tamu: cocokkan nomor yang dikirimkan viewer dengan nomor pesanan.
   const hint = normalizePhone(phoneHint ?? "");
   if (hint && hint === order.whatsapp) return { kind: "phone" as const, order };
 
@@ -59,6 +57,11 @@ export async function GET(req: Request, { params }: Ctx) {
     service: o.service,
     washType: o.washType,
     status: o.status,
+    // --- TAMBAHAN: Field Pembayaran agar terbaca di frontend ---
+    statusPembayaran: o.statusPembayaran,
+    metodePembayaran: o.metodePembayaran,
+    dibayarPada: o.dibayarPada,
+    // -----------------------------------------------------------
     cancelReason: o.cancelReason,
     cancelledAt: o.cancelledAt,
     deliveryType: o.deliveryType,
@@ -74,9 +77,7 @@ export async function GET(req: Request, { params }: Ctx) {
     customerName: o.customerName,
   };
 
-  // Data pelanggan hanya untuk admin.
   if (res.kind === "admin") {
-    // Pesanan tamu punya userId null - jangan coba dicari di tabel User.
     const u = o.userId
       ? await prisma.user.findUnique({
           where: { id: o.userId },
@@ -99,7 +100,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Format permintaan salah" }, { status: 400 });
   }
 
-  const parsed = cancelSchema.safeParse(body);
+  const parsed = actionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Permintaan tidak valid" }, { status: 400 });
   }
@@ -117,45 +118,69 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const order = res.order;
 
-  if (order.status === STATUS_CANCELLED) {
-    return NextResponse.json({ error: "Pesanan sudah dibatalkan." }, { status: 400 });
-  }
-  // Pelanggan hanya boleh membatalkan selama masih Menunggu.
-  // Admin boleh membatalkan sampai pesanan benar-benar selesai.
-  if (res.kind !== "admin" && order.status !== "MENUNGGU") {
-    return NextResponse.json(
-      { error: "Pesanan sudah diproses dan tidak bisa dibatalkan." },
-      { status: 400 }
-    );
+  // --- LOGIKA BARU: TANDAI LUNAS (CASH) ---
+  if (parsed.data.action === "pay") {
+    if (res.kind !== "admin") {
+      return NextResponse.json({ error: "Hanya admin yang bisa menandai lunas" }, { status: 403 });
+    }
+
+    try {
+      const updated = await prisma.order.update({
+        where: { id },
+        data: {
+          statusPembayaran: "LUNAS",
+          metodePembayaran: "CASH",
+          dibayarPada: new Date(),
+        },
+      });
+      return NextResponse.json(updated);
+    } catch {
+      return NextResponse.json({ error: "Gagal mengubah status pembayaran" }, { status: 500 });
+    }
   }
 
-  const reason = parsed.data.reason?.trim();
+  // --- LOGIKA LAMA: PEMBATALAN ---
+  if (parsed.data.action === "cancel") {
+    if (order.status === STATUS_CANCELLED) {
+      return NextResponse.json({ error: "Pesanan sudah dibatalkan." }, { status: 400 });
+    }
 
-  // Admin wajib mencantumkan alasan; pelanggan boleh membatalkan tanpa alasan.
-  if (res.kind === "admin" && !reason) {
-    return NextResponse.json({ error: "Alasan pembatalan wajib diisi." }, { status: 400 });
-  }
+    if (res.kind !== "admin" && order.status !== "MENUNGGU") {
+      return NextResponse.json(
+        { error: "Pesanan sudah diproses dan tidak bisa dibatalkan." },
+        { status: 400 }
+      );
+    }
 
-  try {
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        status: STATUS_CANCELLED,
-        cancelReason: reason || null,
-        cancelledAt: new Date(),
-        statusLogs: {
-          create: {
-            status: STATUS_CANCELLED,
-            note: reason || (res.kind === "admin" ? "Dibatalkan admin" : "Dibatalkan pelanggan"),
+    const reason = parsed.data.reason?.trim();
+
+    if (res.kind === "admin" && !reason) {
+      return NextResponse.json({ error: "Alasan pembatalan wajib diisi." }, { status: 400 });
+    }
+
+    try {
+      const updated = await prisma.order.update({
+        where: { id },
+        data: {
+          status: STATUS_CANCELLED,
+          cancelReason: reason || null,
+          cancelledAt: new Date(),
+          statusLogs: {
+            create: {
+              status: STATUS_CANCELLED,
+              note: reason || (res.kind === "admin" ? "Dibatalkan admin" : "Dibatalkan pelanggan"),
+            },
           },
         },
-      },
-      include: { statusLogs: { orderBy: { createdAt: "asc" } } },
-    });
-    return NextResponse.json(updated);
-  } catch {
-    return NextResponse.json({ error: "Gagal membatalkan pesanan" }, { status: 500 });
+        include: { statusLogs: { orderBy: { createdAt: "asc" } } },
+      });
+      return NextResponse.json(updated);
+    } catch {
+      return NextResponse.json({ error: "Gagal membatalkan pesanan" }, { status: 500 });
+    }
   }
+
+  return NextResponse.json({ error: "Action tidak dikenal" }, { status: 400 });
 }
 
 export const dynamic = "force-dynamic";

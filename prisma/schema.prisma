@@ -50,6 +50,9 @@ model Order {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   statusLogs   OrderStatusLog[]
+  statusPembayaran String   @default("BELUM_LUNAS") // BELUM_LUNAS | LUNAS | DP
+  metodePembayaran String?  // CASH | QRIS
+  dibayarPada      DateTime?
   review       Review?
 
   @@index([whatsapp])

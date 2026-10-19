@@ -4,14 +4,6 @@ import { LAUNDRY_INFO } from "@/lib/data";
 import { formatCurrency, formatDate, formatPhone } from "@/lib/utils";
 import { parseItems, type Order } from "@/lib/types";
 
-/**
- * Struk Rossy - mengikuti form cetak asli:
- * slogan vertikal di dua tepi, kop outlet, blok identitas pelanggan, tabel item,
- * dua baris "Jumlah Barang", Total Harga, lalu Syarat & Ketentuan 6 pasal.
- *
- * Dipakai dua jalur: window.print() lewat CSS @media print, dan rasterisasi
- * html-to-image untuk dibagikan / diunduh sebagai foto.
- */
 const SLOGAN_KIRI = "KAMI MERAWAT ANDA MEMAKAI";
 const SLOGAN_KANAN = "KEPUASAN ANDA ADALAH TUJUAN KAMI";
 
@@ -39,12 +31,23 @@ export function Struk({ order }: { order: Order }) {
   const nama = order.customerName || (order.user as { name?: string } | undefined)?.name || "-";
   const alamat = order.pickupAddress || "-";
 
+  // Ambil status pembayaran (pakai as any untuk jaga-jaga kalau tipe Order belum diupdate)
+  const isLunas = (order as any).statusPembayaran === "LUNAS";
+  const metode = (order as any).metodePembayaran || "QRIS";
+
   return (
     <div
       id="struk"
       className="struk relative mx-auto w-[460px] bg-white text-black"
       style={{ fontFamily: "Outfit, ui-sans-serif, system-ui, sans-serif" }}
     >
+      {/* WATERMARK LUNAS (Hanya muncul kalau sudah bayar) */}
+      {isLunas && (
+        <div className="pointer-events-none absolute top-1/3 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 -rotate-[15deg] rounded-xl border-4 border-green-600/30 px-6 py-2 text-6xl font-black uppercase tracking-widest text-green-600/30">
+          LUNAS
+        </div>
+      )}
+
       {/* Tepi: slogan vertikal seperti di form cetak */}
       <div className="pointer-events-none absolute left-0 top-0 flex h-full w-6 items-center justify-center border-r border-dashed border-black/30">
         <span
@@ -142,6 +145,7 @@ export function Struk({ order }: { order: Order }) {
             <dd className="tabular shrink-0 font-semibold">{kilo > 0 ? kilo : 0}</dd>
             <dd className="shrink-0">Kilo</dd>
           </div>
+          
           <div className="mt-2 flex items-baseline gap-1 border-t border-black pt-2">
             <dt className="shrink-0 font-semibold">Total Harga</dt>
             <dt className="shrink-0">Rp.</dt>
@@ -149,6 +153,13 @@ export function Struk({ order }: { order: Order }) {
             <dd className="tabular shrink-0 text-[13px] font-bold">
               {order.total.toLocaleString("id-ID")}
             </dd>
+          </div>
+
+          {/* Status Pembayaran Text */}
+          <div className="flex justify-end pt-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border rounded ${isLunas ? "border-green-600 text-green-600" : "border-amber-500 text-amber-500"}`}>
+              {isLunas ? `LUNAS (${metode})` : "BELUM LUNAS"}
+            </span>
           </div>
         </dl>
 

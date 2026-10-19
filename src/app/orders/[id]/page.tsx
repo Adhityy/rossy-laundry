@@ -1,10 +1,11 @@
 "use client";
+import Script from "next/script";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Check, Info, Star, UserRound } from "lucide-react";
+import { ArrowLeft, Ban, Check, Info, Star, UserRound, CreditCard, CheckCircle2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,9 @@ import { parseItems, type Order } from "@/lib/types";
 
 type Detail = Order & {
   user?: { id: string; name: string; email: string; phone: string | null; address: string | null } | null;
+  statusPembayaran?: string;
+  metodePembayaran?: string;
+  dibayarPada?: string;
 };
 
 function Stepper({ current, cancelled }: { current: number; cancelled: boolean }) {
@@ -65,6 +69,7 @@ function Stepper({ current, cancelled }: { current: number; cancelled: boolean }
 
 export default function TrackingPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params.id;
   const [order, setOrder] = useState<Detail | { error: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +78,9 @@ export default function TrackingPage() {
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
 
-  // Penilaian - hanya muncul setelah status SELESAI.
+  const [showConfirmLunas, setShowConfirmLunas] = useState(false);
+  const [processingLunas, setProcessingLunas] = useState(false);
+
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [reviewName, setReviewName] = useState("");
@@ -82,22 +89,84 @@ export default function TrackingPage() {
   const isAdmin =
     (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
 
+  const handleBayar = async () => {
+    if (!order || "error" in order) return;
+
+    try {
+      const res = await fetch("/api/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          orderId: order.orderNumber, 
+          grossAmount: order.total 
+        }),
+      });
+      
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // @ts-ignore
+      window.snap.pay(data.token, {
+        onSuccess: function (result: any) {
+          toast.success("Pembayaran Berhasil!");
+          setTimeout(() => window.location.reload(), 1500);
+        },
+        onPending: function (result: any) {
+          toast.info("Menunggu pembayaran diselesaikan.");
+          setTimeout(() => window.location.reload(), 2000); 
+        },
+        onError: function (result: any) {
+          toast.error("Pembayaran gagal. Silakan coba lagi.");
+        },
+        onClose: function () {
+          toast.warning("Anda menutup jendela pembayaran sebelum menyelesaikannya.");
+        }
+      });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleTandaiLunas = () => {
+    setShowConfirmLunas(true);
+  };
+
+  const confirmTandaiLunas = async () => {
+    setShowConfirmLunas(false);
+    setProcessingLunas(true);
+
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pay" }),
+      });
+
+      if (!res.ok) throw new Error("Gagal mengubah status");
+      
+      toast.success("Pesanan berhasil ditandai LUNAS");
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setProcessingLunas(false);
+    }
+  };
+
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      // Tamu membawa nomor yang dipakai saat pencarian; pemilik/admin tidak perlu.
       const q = phone ? `?phone=${encodeURIComponent(phone)}` : "";
       const res = await fetch(`/api/orders/${id}${q}`);
       const data = await res.json();
       setOrder(data as Detail | { error: string });
     } catch {
-      /* biarkan state lama, polling berikutnya mencoba lagi */
+      /* biarkan state lama */
     } finally {
       setLoading(false);
     }
   }, [id, phone]);
 
-  // Baca ?phone sekali, baru mulai polling - supaya tamu tidak memicu fetch 403.
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     setPhone(sp.get("phone"));
@@ -131,7 +200,7 @@ export default function TrackingPage() {
       }
       toast.success("Pesanan dibatalkan.");
       setReason("");
-      await load();
+      router.push("/orders/new");
     } catch {
       toast.error("Tidak bisa terhubung ke server.");
     } finally {
@@ -139,7 +208,6 @@ export default function TrackingPage() {
     }
   }
 
-  // Pratinjau nama pengulas, hanya sekali saat pesanan pertama terbaca.
   useEffect(() => {
     if (!order || "error" in order) return;
     const pre = order.customerName || order.user?.name || "";
@@ -202,8 +270,7 @@ export default function TrackingPage() {
         </span>
         <h1 className="mt-5 text-lg font-semibold">Pesanan tidak bisa dibuka</h1>
         <p className="mx-auto mt-2 max-w-[46ch] text-sm text-muted-foreground">
-          {serverError ||
-            "Nomor WhatsApp tidak ikut terbawa. Cari ulang di halaman Cek pesanan."}
+          {serverError || "Nomor WhatsApp tidak ikut terbawa. Cari ulang di halaman Cek pesanan."}
         </p>
         <Button asChild variant="outline" className="mt-6">
           <Link href="/orders">Cari lagi</Link>
@@ -216,13 +283,41 @@ export default function TrackingPage() {
   const currentStep = statusStep(order.status);
   const items = parseItems(order.items);
   const logs = [...(order.statusLogs ?? [])];
-  const canCancel = !cancelled && (isAdmin || order.status === "MENUNGGU");
+  const isLunas = order.statusPembayaran === "LUNAS";
+  
+  const canCancel = !cancelled && !isLunas && (isAdmin || order.status === "MENUNGGU");
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-12 sm:px-6">
+      <Script
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+        strategy="lazyOnload"
+      />
+
+      {showConfirmLunas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-semibold tracking-tight">Konfirmasi Pembayaran</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Apakah Anda yakin ingin menandai pesanan ini sebagai <strong className="text-foreground">LUNAS (Cash)</strong>? 
+              Tindakan ini akan mengubah status pembayaran secara permanen.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowConfirmLunas(false)}>
+                Batal
+              </Button>
+              <Button onClick={confirmTandaiLunas} className="bg-green-600 hover:bg-green-700">
+                <Check size={16} className="mr-2" /> Ya, Tandai Lunas
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/orders">
-          <ArrowLeft size={15} strokeWidth={2} /> Cek pesanan lain
+        <Link href={isAdmin ? "/admin" : "/orders"}>
+          <ArrowLeft size={15} strokeWidth={2} /> {isAdmin ? "Dashboard" : "Cek pesanan lain"}
         </Link>
       </Button>
 
@@ -253,20 +348,23 @@ export default function TrackingPage() {
             {order.deliveryType === "DELIVERY" ? "Antar jemput" : "Antar ke toko"}
           </p>
 
-          <div className="flex flex-wrap gap-2">
+          <Stepper current={currentStep} cancelled={cancelled} />
+          
+          <p className="text-sm font-medium">
+            Tahap sekarang: <span className="text-primary">{statusLabel(order.status)}</span>
+          </p>
+
+          <div className="flex flex-wrap gap-2 pt-2">
             <StrukDialog order={order} />
           </div>
 
           <p className="text-sm text-muted-foreground">
-            WhatsApp
-            <span className="tabular ml-2 text-foreground">{formatPhone(order.whatsapp)}</span>
+            WhatsApp <span className="tabular ml-2 text-foreground">{formatPhone(order.whatsapp)}</span>
           </p>
 
           {order.pickupAddress && (
             <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Alamat penjemputan
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Alamat penjemputan</p>
               <p className="mt-1.5 text-sm leading-relaxed">{order.pickupAddress}</p>
             </div>
           )}
@@ -276,118 +374,74 @@ export default function TrackingPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Dibatalkan {order.cancelledAt ? formatDateTime(order.cancelledAt) : ""}
               </p>
-              <p className="mt-1.5 text-sm">
-                {order.cancelReason || "Tanpa keterangan."}
-              </p>
+              <p className="mt-1.5 text-sm">{order.cancelReason || "Tanpa keterangan."}</p>
             </div>
           )}
-
-          <Stepper current={currentStep} cancelled={cancelled} />
-          <p className="text-sm">
-            Tahap sekarang{" "}
-            <span className="font-medium">{statusLabel(order.status)}</span>
-          </p>
         </CardContent>
       </Card>
 
-      {isAdmin && order.user && (
-        <Card>
-          <CardHeader className="space-y-0 pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserRound size={16} strokeWidth={1.75} /> Informasi pelanggan
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Nama
-              </p>
-              <p className="mt-1 text-sm">{order.user.name}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Nomor WhatsApp
-              </p>
-              <p className="tabular mt-1 text-sm">{formatPhone(order.whatsapp)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Email
-              </p>
-              <p className="mt-1 text-sm">{order.user.email}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Telepon akun
-              </p>
-              <p className="tabular mt-1 text-sm">
-                {order.user.phone ? formatPhone(order.user.phone) : "-"}
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Alamat akun
-              </p>
-              <p className="mt-1 text-sm">{order.user.address || "-"}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
+      <Card className={isLunas ? "border-green-200 bg-green-50/30" : ""}>
         <CardHeader className="space-y-0 pb-3">
-          <CardTitle className="text-base">Riwayat status</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wallet size={18} /> Informasi Pembayaran
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada perubahan status.</p>
-          ) : (
-            <ol className="space-y-4">
-              {logs.map((log, i) => (
-                <li key={log.id} className="flex items-start gap-3">
-                  <span
-                    className={[
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      i === logs.length - 1 ? "bg-primary" : "bg-border",
-                    ].join(" ")}
-                    aria-hidden
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{statusLabel(log.status)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateTime(log.createdAt)}
-                      {log.note ? ` · ${log.note}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Status</p>
+              <p className={`mt-1 flex items-center gap-1.5 text-lg font-bold ${isLunas ? "text-green-700" : "text-amber-600"}`}>
+                {isLunas ? <CheckCircle2 size={20} /> : <Info size={20} />}
+                {isLunas ? "LUNAS" : "BELUM LUNAS"}
+              </p>
+              {isLunas && (
+                <p className="text-xs text-green-600 mt-1">
+                  Metode: {order.metodePembayaran || "QRIS"} 
+                  {order.dibayarPada && ` • ${formatDateTime(order.dibayarPada)}`}
+                </p>
+              )}
+              
+              {!isLunas && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pembayaran bisa dilakukan via QRIS atau Tunai.
+                </p>
+              )}
+            </div>
+            
+            {!isLunas && order.status !== "DIBATALKAN" && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* TOMBOL BAYAR: HANYA TAMPIL UNTUK CUSTOMER */}
+                {!isAdmin && (
+                  <Button onClick={handleBayar} className="bg-blue-600 hover:bg-blue-700">
+                    <CreditCard size={16} className="mr-2" /> Bayar (QRIS)
+                  </Button>
+                )}
+                
+                {/* TOMBOL TANDAI LUNAS: HANYA TAMPIL UNTUK ADMIN */}
+                {isAdmin && (
+                  <Button onClick={handleTandaiLunas} disabled={processingLunas} variant="outline" className="border-green-600 text-green-700 hover:bg-green-100">
+                    <Check size={16} className="mr-2" /> {processingLunas ? "Memproses..." : "Tandai Lunas (Cash)"}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="space-y-0 pb-3">
-          <CardTitle className="text-base">Detail item</CardTitle>
-        </CardHeader>
+        <CardHeader className="space-y-0 pb-3"><CardTitle className="text-base">Detail item</CardTitle></CardHeader>
         <CardContent className="space-y-2.5">
           {items.map((item, i) => (
             <div key={`${item.name}-${i}`} className="flex items-baseline justify-between gap-4">
-              <span className="text-sm">
-                {item.name}
-                <span className="tabular ml-1.5 text-muted-foreground">× {item.qty}</span>
-              </span>
-              <span className="tabular text-sm font-medium">
-                {formatCurrency(item.price * item.qty)}
-              </span>
+              <span className="text-sm">{item.name} <span className="tabular ml-1.5 text-muted-foreground">× {item.qty}</span></span>
+              <span className="tabular text-sm font-medium">{formatCurrency(item.price * item.qty)}</span>
             </div>
           ))}
-
           <div className="flex items-baseline justify-between gap-4 border-t border-border pt-3">
             <span className="text-sm font-medium">Total</span>
             <span className="tabular text-sm font-semibold">{formatCurrency(order.total)}</span>
           </div>
-
           {order.notes && (
             <div className="mt-4 rounded-md border border-border bg-muted px-3.5 py-3">
               <p className="text-xs font-medium text-muted-foreground">Catatan</p>
@@ -397,72 +451,64 @@ export default function TrackingPage() {
         </CardContent>
       </Card>
 
+      {isAdmin && order.user && (
+        <Card>
+          <CardHeader className="space-y-0 pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><UserRound size={16} /> Informasi pelanggan</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div><p className="text-xs font-medium uppercase text-muted-foreground">Nama</p><p className="mt-1 text-sm">{order.user.name}</p></div>
+            <div><p className="text-xs font-medium uppercase text-muted-foreground">Nomor WhatsApp</p><p className="tabular mt-1 text-sm">{formatPhone(order.whatsapp)}</p></div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!cancelled && (
+        <Card>
+          <CardHeader className="space-y-0 pb-3"><CardTitle className="text-base">Riwayat status</CardTitle></CardHeader>
+          <CardContent>
+            {logs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Belum ada perubahan status.</p>
+            ) : (
+              <ol className="space-y-4">
+                {logs.map((log, i) => (
+                  <li key={log.id} className="flex items-start gap-3">
+                    <span className={["mt-1.5 size-2 shrink-0 rounded-full", i === logs.length - 1 ? "bg-primary" : "bg-border"].join(" ")} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{statusLabel(log.status)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateTime(log.createdAt)} {log.note ? ` · ${log.note}` : ""}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {order.status === "SELESAI" && !order.review && (
         <Card>
           <CardHeader className="space-y-1 pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Star size={16} strokeWidth={1.75} /> Beri penilaian
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Pesanan sudah selesai. Penilaian Anda tampil di halaman beranda.
-            </p>
+            <CardTitle className="flex items-center gap-2 text-base"><Star size={16} /> Beri penilaian</CardTitle>
+            <p className="text-sm text-muted-foreground">Pesanan sudah selesai. Penilaian Anda tampil di halaman beranda.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-1">
               {[1, 2, 3, 4, 5].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-label={`${v} dari 5 bintang`}
-                  aria-pressed={rating === v}
-                  onClick={() => setRating(v)}
-                  className="rounded p-1 transition-colors hover:bg-accent"
-                >
-                  <Star
-                    size={26}
-                    strokeWidth={1.5}
-                    className={
-                      v <= rating
-                        ? "fill-primary text-primary"
-                        : "text-muted-foreground"
-                    }
-                  />
+                <button key={v} type="button" onClick={() => setRating(v)} className="rounded p-1 transition-colors hover:bg-accent">
+                  <Star size={26} strokeWidth={1.5} className={v <= rating ? "fill-primary text-primary" : "text-muted-foreground"} />
                 </button>
               ))}
-              <span className="ml-2 text-sm text-muted-foreground">
-                {rating > 0 ? `${rating} dari 5` : "Belum dipilih"}
-              </span>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="rv-name">Nama (tampil di beranda)</Label>
-              <Input
-                id="rv-name"
-                value={reviewName}
-                maxLength={40}
-                onChange={(e) => setReviewName(e.target.value)}
-                placeholder="Nama Anda"
-              />
+              <Label htmlFor="rv-name">Nama</Label>
+              <Input id="rv-name" value={reviewName} maxLength={40} onChange={(e) => setReviewName(e.target.value)} placeholder="Nama Anda" />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="rv-comment">Ulasan</Label>
-              <Textarea
-                id="rv-comment"
-                rows={3}
-                className="resize-none"
-                value={comment}
-                maxLength={500}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Bagaimana hasil cucian dan pelayanannya?"
-              />
-              <p className="text-xs text-muted-foreground">{comment.length}/500</p>
+              <Textarea id="rv-comment" rows={3} className="resize-none" value={comment} maxLength={500} onChange={(e) => setComment(e.target.value)} placeholder="Bagaimana hasil cucian?" />
             </div>
-
-            <Button
-              onClick={submitReview}
-              disabled={reviewing || rating < 1 || comment.trim().length < 3}
-            >
+            <Button onClick={submitReview} disabled={reviewing || rating < 1 || comment.trim().length < 3}>
               {reviewing ? "Mengirim..." : "Kirim penilaian"}
             </Button>
           </CardContent>
@@ -471,61 +517,33 @@ export default function TrackingPage() {
 
       {order.review && (
         <Card>
-          <CardHeader className="space-y-1 pb-3">
-            <CardTitle className="text-base">Penilaian Anda</CardTitle>
-          </CardHeader>
+          <CardHeader className="space-y-1 pb-3"><CardTitle className="text-base">Penilaian Anda</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex gap-0.5" aria-label={`${order.review.rating} dari 5 bintang`}>
+            <div className="flex gap-0.5">
               {[1, 2, 3, 4, 5].map((v) => (
-                <Star
-                  key={v}
-                  size={17}
-                  strokeWidth={1.5}
-                  className={
-                    v <= order.review!.rating ? "fill-primary text-primary" : "text-muted-foreground"
-                  }
-                />
+                <Star key={v} size={17} strokeWidth={1.5} className={v <= order.review!.rating ? "fill-primary text-primary" : "text-muted-foreground"} />
               ))}
             </div>
             <p className="text-sm">{order.review.comment}</p>
-            <p className="text-xs text-muted-foreground">
-              {order.review.name} · {formatDateTime(order.review.createdAt)}
-            </p>
+            <p className="text-xs text-muted-foreground">{order.review.name} · {formatDateTime(order.review.createdAt)}</p>
           </CardContent>
         </Card>
       )}
 
       {canCancel && (
         <Card className="border-destructive/40">
-          <CardHeader className="space-y-0 pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Ban size={16} strokeWidth={1.75} /> Batalkan pesanan
-            </CardTitle>
-          </CardHeader>
+          <CardHeader className="space-y-0 pb-3"><CardTitle className="flex items-center gap-2 text-base"><Ban size={16} /> Batalkan pesanan</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {isAdmin
-                ? "Admin dapat membatalkan pesanan pada tahap mana pun. Alasan wajib dicatat."
-                : "Pesanan masih Tahap Menunggu, jadi masih bisa dibatalkan."}
+              {isAdmin 
+                ? "Admin dapat membatalkan pesanan pada tahap mana pun." 
+                : "Pesanan masih Tahap Menunggu dan belum Lunas, jadi masih bisa dibatalkan."}
             </p>
             <div className="space-y-2">
-              <Label htmlFor="cancel-reason">
-                Alasan {isAdmin ? "" : "(opsional)"}
-              </Label>
-              <Textarea
-                id="cancel-reason"
-                rows={2}
-                className="resize-none"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder={isAdmin ? "Misal: pelanggan membatalkan lewat telepon" : ""}
-              />
+              <Label htmlFor="cancel-reason">Alasan {isAdmin ? "" : "(opsional)"}</Label>
+              <Textarea id="cancel-reason" rows={2} className="resize-none" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={isAdmin ? "Alasan pembatalan" : ""} />
             </div>
-            <Button
-              variant="destructive"
-              onClick={cancelOrder}
-              disabled={cancelling || (isAdmin && reason.trim().length < 3)}
-            >
+            <Button variant="destructive" onClick={cancelOrder} disabled={cancelling || (isAdmin && reason.trim().length < 3)}>
               {cancelling ? "Membatalkan..." : "Batalkan pesanan"}
             </Button>
           </CardContent>

@@ -7,7 +7,6 @@ import { PriceTable } from "@/components/PriceTable";
 import { ContactCta } from "@/components/ContactCta";
 import { Footer } from "@/components/Footer";
 
-// Tarif dibaca dari DB saat prerender; ISR biar perubahan harga kebawa tanpa deploy ulang.
 export const revalidate = 60;
 
 export default function HomePage() {
@@ -17,7 +16,6 @@ export default function HomePage() {
       <ServicesSection />
       <ServiceArea />
       <Features />
-      {/* Ulasan pelanggan, tepat di atas daftar harga. Tidak dirender kalau belum ada ulasan. */}
       <ReviewSlider />
       <PriceTable />
       <ContactCta />

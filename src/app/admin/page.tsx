@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Package, DollarSign, TrendingUp, Clock, FilePlus } from "lucide-react";
+import { toast } from "sonner";
 import {
   Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ORDER_STATUSES, STATUS_IN_PROGRESS } from "@/lib/data";
+import { ORDER_STATUSES, STATUS_IN_PROGRESS, STATUS_CANCELLED } from "@/lib/data"; // Tambah STATUS_CANCELLED
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { Order } from "@/lib/types";
 
@@ -24,18 +25,24 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
+  const fetchOrders = () => {
     fetch("/api/orders/admin")
       .then((r) => r.json())
       .then((d: unknown) => {
-        if (!alive) return;
         setOrders(Array.isArray(d) ? (d as Order[]) : []);
         setLoading(false);
       })
-      .catch(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+      .catch(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const timer = setInterval(fetchOrders, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   async function changeStatus(orderId: string, next: string) {
@@ -51,6 +58,32 @@ export default function AdminDashboard() {
       if (!res.ok) setOrders(previous);
     } catch { setOrders(previous); }
     finally { setSavingId(null); }
+  }
+
+  async function handleTandaiLunas(orderId: string) {
+    if (!window.confirm("Tandai pesanan ini sebagai LUNAS (Cash)?")) return;
+    
+    setPayingId(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pay" }),
+      });
+
+      if (res.ok) {
+        toast.success("Pesanan berhasil ditandai LUNAS");
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, statusPembayaran: "LUNAS", metodePembayaran: "CASH" } : o))
+        );
+      } else {
+        toast.error("Gagal mengubah status");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan sistem");
+    } finally {
+      setPayingId(null);
+    }
   }
 
   const today = new Date().toDateString();
@@ -72,6 +105,9 @@ export default function AdminDashboard() {
     { icon: Clock, label: "Sedang diproses", value: String(inProgress.length) },
   ];
 
+  // --- FILTER DATA: Hanya tampilkan pesanan yang TIDAK dibatalkan di tabel ---
+  const activeOrders = orders.filter((o) => o.status !== STATUS_CANCELLED);
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -86,29 +122,29 @@ export default function AdminDashboard() {
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {loading
           ? [0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-5">
-                <Skeleton className="h-9 w-9" />
-                <Skeleton className="mt-3 h-3 w-28" />
-                <Skeleton className="mt-2 h-6 w-36" />
+              <div key={i} className="rounded-xl border border-border bg-card p-4 sm:p-5">
+                <Skeleton className="h-8 w-8 sm:h-9 sm:w-9" />
+                <Skeleton className="mt-2 sm:mt-3 h-3 w-20 sm:w-28" />
+                <Skeleton className="mt-2 h-5 sm:h-6 w-24 sm:w-36" />
               </div>
             ))
           : stats.map((s) => (
-              <div key={s.label} className="rounded-xl border border-border bg-card p-5">
-                <span className="grid size-9 place-items-center rounded-md bg-accent text-foreground">
-                  <s.icon size={17} strokeWidth={1.75} />
+              <div key={s.label} className="rounded-xl border border-border bg-card p-4 sm:p-5">
+                <span className="grid size-8 sm:size-9 place-items-center rounded-md bg-accent text-foreground">
+                  <s.icon size={16} strokeWidth={1.75} />
                 </span>
-                <p className="mt-3 text-sm text-muted-foreground">{s.label}</p>
-                <p className="tabular mt-1 text-xl font-semibold">{s.value}</p>
+                <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-muted-foreground leading-tight">{s.label}</p>
+                <p className="tabular mt-1 text-lg sm:text-xl font-semibold">{s.value}</p>
               </div>
             ))}
       </div>
 
       <Card>
         <CardHeader className="space-y-0 pb-3">
-          <CardTitle className="text-base">Semua pesanan</CardTitle>
+          <CardTitle className="text-base">Semua pesanan (Aktif)</CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
           {loading ? (
@@ -118,11 +154,11 @@ export default function AdminDashboard() {
           ) : (
             <>
               <div className="md:hidden">
-                {orders.length > 0 && (
-                  <p className="mb-3 text-sm text-muted-foreground">Total {orders.length} pesanan.</p>
+                {activeOrders.length > 0 && (
+                  <p className="mb-3 text-sm text-muted-foreground px-4">Total {activeOrders.length} pesanan aktif.</p>
                 )}
-                <ul className="space-y-3">
-                  {orders.map((o) => (
+                <ul className="space-y-3 px-4">
+                  {activeOrders.map((o: any) => (
                     <li key={o.id} className="rounded-lg border border-border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <span className="tabular text-xs text-muted-foreground">{o.orderNumber}</span>
@@ -133,14 +169,32 @@ export default function AdminDashboard() {
                         <div className="mt-1 truncate text-xs text-muted-foreground">Jemput: {o.pickupAddress}</div>
                       )}
                       <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(o.createdAt)}</div>
-                      <div className="mt-3 flex items-center justify-between gap-3">
+                      
+                      <div className="mt-3 flex flex-col gap-2 items-start">
                         {nextOf(o.status) ? (
                           <Button size="sm" variant="outline" disabled={savingId === o.id}
                             onClick={() => changeStatus(o.id, nextOf(o.status)!.key)}>
                             {savingId === o.id ? "Menyimpan..." : `Lanjut ke ${nextOf(o.status)!.label}`}
                           </Button>
                         ) : (<StatusBadge status={o.status} />)}
-                        <Link href={`/orders/${o.id}`} className="shrink-0 text-sm text-primary hover:underline">Detail</Link>
+                        
+                        {o.statusPembayaran === 'LUNAS' ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                            Lunas ({o.metodePembayaran || "QRIS"})
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={() => handleTandaiLunas(o.id)}
+                            disabled={payingId === o.id}
+                            className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-200 transition-colors cursor-pointer"
+                            title="Klik untuk menandai Lunas (Cash)"
+                          >
+                            {payingId === o.id ? "Memproses..." : "Belum Lunas"}
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-3 text-right">
+                         <Link href={`/orders/${o.id}`} className="text-sm text-primary hover:underline">Detail</Link>
                       </div>
                     </li>
                   ))}
@@ -150,7 +204,7 @@ export default function AdminDashboard() {
               <div className="hidden overflow-x-auto md:block">
                 <Table>
                   <TableCaption>
-                    {orders.length === 0 ? "Belum ada pesanan masuk." : `Total ${orders.length} pesanan.`}
+                    {activeOrders.length === 0 ? "Belum ada pesanan aktif." : `Total ${activeOrders.length} pesanan aktif.`}
                   </TableCaption>
                   <TableHeader>
                     <TableRow>
@@ -163,7 +217,7 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((o) => (
+                    {activeOrders.map((o: any) => (
                       <TableRow key={o.id}>
                         <TableCell className="tabular pl-6 text-xs">{o.orderNumber}</TableCell>
                         <TableCell>
@@ -174,12 +228,29 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">{formatDateTime(o.createdAt)}</TableCell>
                         <TableCell>
-                          {nextOf(o.status) ? (
-                            <Button size="sm" variant="outline" disabled={savingId === o.id}
-                              onClick={() => changeStatus(o.id, nextOf(o.status)!.key)}>
-                              {savingId === o.id ? "Menyimpan..." : `Lanjut ke ${nextOf(o.status)!.label}`}
-                            </Button>
-                          ) : (<StatusBadge status={o.status} />)}
+                          <div className="flex flex-col items-start gap-2">
+                            {nextOf(o.status) ? (
+                              <Button size="sm" variant="outline" disabled={savingId === o.id}
+                                onClick={() => changeStatus(o.id, nextOf(o.status)!.key)}>
+                                {savingId === o.id ? "Menyimpan..." : `Lanjut ke ${nextOf(o.status)!.label}`}
+                              </Button>
+                            ) : (<StatusBadge status={o.status} />)}
+                            
+                            {o.statusPembayaran === 'LUNAS' ? (
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                                Lunas ({o.metodePembayaran || "QRIS"})
+                              </span>
+                            ) : (
+                              <button 
+                                onClick={() => handleTandaiLunas(o.id)}
+                                disabled={payingId === o.id}
+                                className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-200 transition-colors cursor-pointer"
+                                title="Klik untuk menandai Lunas (Cash)"
+                              >
+                                {payingId === o.id ? "Memproses..." : "Belum Lunas"}
+                              </button>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="tabular text-right font-medium">{formatCurrency(o.total)}</TableCell>
                         <TableCell className="pr-6 text-right">
@@ -194,12 +265,6 @@ export default function AdminDashboard() {
           )}
         </CardContent>
       </Card>
-
-      {!loading && orders.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Buat pesanan pertama lewat halaman <Link href="/orders/new" className="text-primary hover:underline">Buat Pesanan</Link>.
-        </p>
-      )}
     </div>
   );
 }
