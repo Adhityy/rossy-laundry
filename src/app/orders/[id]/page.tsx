@@ -87,7 +87,9 @@ export default function TrackingPage() {
   const [reviewing, setReviewing] = useState(false);
   const { data: session } = useSession();
   const isAdmin =
-    (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
+    ["ADMIN", "OWNER"].includes(
+      (session?.user as { role?: string } | undefined | null)?.role ?? ""
+    );
 
   const handleBayar = async () => {
     if (!order || "error" in order) return;

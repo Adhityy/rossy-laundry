@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateOrderNumber, normalizePhone, phoneVariants } from "@/lib/utils";
 import { DELIVERY_FEE, MIN_ORDER_KG } from "@/lib/data";
+import { isStaffRole } from "@/lib/roles";
 import { z } from "zod";
 
 const KILOAN_RATES: Record<string, { label: string; rate: number }> = {
@@ -61,6 +62,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   let body: unknown;
   try {
@@ -142,18 +146,16 @@ export async function POST(req: Request) {
 
   let userId: string | null = null;
   let isAdminEntry = false;
-  if (session?.user) {
-    const role = (session.user as { role?: string }).role;
-    if (role === "ADMIN") {
-      isAdminEntry = true;
-      const variants = phoneVariants(whatsapp);
-      const owner = variants.length
-        ? await prisma.user.findFirst({ where: { phone: { in: variants } } })
-        : null;
-      userId = owner?.id ?? null;
-    } else {
-      userId = (session.user as { id: string }).id;
-    }
+  const role = (session.user as { role?: string }).role;
+  if (isStaffRole(role)) {
+    isAdminEntry = true;
+    const variants = phoneVariants(whatsapp);
+    const owner = variants.length
+      ? await prisma.user.findFirst({ where: { phone: { in: variants } } })
+      : null;
+    userId = owner?.id ?? null;
+  } else {
+    userId = (session.user as { id: string }).id;
   }
 
   try {

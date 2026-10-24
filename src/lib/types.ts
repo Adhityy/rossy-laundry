@@ -21,6 +21,8 @@ export type Order = {
   service: string; // KILOAN | SATUAN
   washType: "LAUNDRY" | "DRY_CLEAN";
   status: string; // see ORDER_STATUSES, or DIBATALKAN
+  statusPembayaran?: "BELUM_LUNAS" | "LUNAS" | "DP";
+  metodePembayaran?: string | null;
   cancelReason?: string | null;
   cancelledAt?: string | null;
   deliveryType: "PICKUP" | "DELIVERY";

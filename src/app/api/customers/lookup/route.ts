@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone, phoneVariants } from "@/lib/utils";
 import { lookupPhoneName } from "@/lib/osint";
+import { isStaffRole } from "@/lib/roles";
 
 /**
  * Ambil nama pemilik nomor WhatsApp - khusus admin, dipakai form pesanan datang langsung.
@@ -17,8 +18,9 @@ import { lookupPhoneName } from "@/lib/osint";
  */
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session?.user || (session.user as { role?: string }).role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (!session?.user || !isStaffRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
 
   const raw = new URL(req.url).searchParams.get("phone") ?? "";

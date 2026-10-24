@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { Menu, X, Shirt, ArrowRight, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isStaffRole, isOwnerRole } from "@/lib/roles";
 
 const links = [
   { href: "/", label: "Beranda" },
@@ -18,7 +19,6 @@ const links = [
 const adminLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/prices", label: "Harga" },
-  { href: "/admin/reports", label: "Laporan" },
 ];
 
 export function Navbar() {
@@ -26,12 +26,28 @@ export function Navbar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const reduce = useReducedMotion();
-  const onAdminPath = pathname.startsWith("/admin");
-  const isRoleAdmin =
-    (session?.user as { role?: string } | undefined | null)?.role === "ADMIN";
-  const isAdmin = onAdminPath || isRoleAdmin;
+  const role = (session?.user as { role?: string } | undefined | null)?.role;
+  const isStaff = isStaffRole(role);
+  const isOwner = isOwnerRole(role);
   const authed = status === "authenticated";
-  const items = isAdmin ? adminLinks : links;
+  const isGuest = status === "unauthenticated";
+  const items = isStaff
+    ? [
+        ...adminLinks,
+        ...(isOwner
+          ? [
+              { href: "/admin/reports", label: "Laporan" },
+              { href: "/admin/expenses", label: "Pengeluaran" },
+            ]
+          : []),
+      ]
+    : links
+        .filter((link) => !isGuest || link.href !== "/orders")
+        .map((link) =>
+          isGuest && link.href === "/orders/new"
+            ? { ...link, href: "/login?callbackUrl=%2Forders%2Fnew" }
+            : link
+        );
 
   const accountLabel = authed ? "Profil" : "Masuk";
   const accountHref = authed ? "/profile" : "/login";

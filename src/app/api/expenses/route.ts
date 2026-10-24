@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isOwnerRole } from "@/lib/roles";
 import { z } from "zod";
 
 const schema = z.object({
@@ -12,8 +13,9 @@ const schema = z.object({
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user || (session.user as any).role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (!session?.user || !isOwnerRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
 
   const expenses = await prisma.expense.findMany({ orderBy: { date: "desc" } });
@@ -22,8 +24,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user || (session.user as any).role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (!session?.user || !isOwnerRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
 
   try {

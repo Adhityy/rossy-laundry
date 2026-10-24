@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/utils";
 import { STATUS_CANCELLED } from "@/lib/data";
 import { z } from "zod";
+import { isStaffRole } from "@/lib/roles";
 
 // Perbarui schema agar bisa menerima action "cancel" atau "pay"
 const actionSchema = z.object({
@@ -15,17 +16,19 @@ const actionSchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 async function authorize(id: string, phoneHint?: string) {
+  const session = await auth();
+  if (!session?.user) return { kind: "unauthorized" as const };
+
   const order = await prisma.order.findUnique({
     where: { id },
     include: { statusLogs: { orderBy: { createdAt: "asc" } }, review: true },
   });
   if (!order) return { kind: "not_found" as const };
 
-  const session = await auth();
-  const userId = session?.user ? (session.user as { id?: string }).id : undefined;
-  const role = session?.user ? (session.user as { role?: string }).role : undefined;
+  const userId = (session.user as { id?: string }).id;
+  const role = (session.user as { role?: string }).role;
 
-  if (role === "ADMIN") return { kind: "admin" as const, order };
+  if (isStaffRole(role)) return { kind: "admin" as const, order };
   if (userId && order.userId === userId) return { kind: "owner" as const, order };
 
   const hint = normalizePhone(phoneHint ?? "");
@@ -39,6 +42,9 @@ export async function GET(req: Request, { params }: Ctx) {
   const url = new URL(req.url);
   const res = await authorize(id, url.searchParams.get("phone") ?? undefined);
 
+  if (res.kind === "unauthorized") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (res.kind === "not_found") {
     return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   }
@@ -109,6 +115,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const phoneHint = parsed.data.phone ?? url.searchParams.get("phone") ?? undefined;
   const res = await authorize(id, phoneHint);
 
+  if (res.kind === "unauthorized") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (res.kind === "not_found") {
     return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   }

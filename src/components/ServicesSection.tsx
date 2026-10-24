@@ -1,5 +1,6 @@
 "use client";
 import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import { Droplets, Shirt, Truck, Timer, Sparkles, ShieldCheck } from "lucide-react";
 
 const services = [
@@ -7,17 +8,43 @@ const services = [
     icon: Droplets,
     title: "Cuci Kiloan",
     desc: "Per kilogram, mulai Rp 7.000. Cuci regular, bersih dan wangi.",
-    cell: "md:col-span-1 md:row-span-2",
+    image: "/service-washing-process.jpg",
+    imageAlt: "Pekerja memasukkan cucian ke mesin laundry",
   },
-  { icon: Shirt, title: "Cuci Satuan", desc: "Per potong untuk kemeja, jas, kebaya, dan barang rumah tangga.", cell: "" },
-  { icon: Sparkles, title: "Dry Clean", desc: "Pencucian kering untuk bahan yang tidak boleh terkena air.", cell: "" },
-  { icon: Truck, title: "Antar Jemput", desc: "Kami ambil dan antar ke rumah Anda tanpa biaya tambahan.", cell: "" },
-  { icon: Timer, title: "Express 1/2 Hari", desc: "Pesanan rampung dalam satu sampai dua hari.", cell: "" },
+  {
+    icon: Shirt,
+    title: "Cuci Satuan",
+    desc: "Per potong untuk kemeja, jas, kebaya, dan barang rumah tangga.",
+    image: "/service-folding-clothes.jpg",
+    imageAlt: "Pekerja laundry melipat dan menangani pakaian",
+  },
+  {
+    icon: Sparkles,
+    title: "Dry Clean",
+    desc: "Pencucian kering untuk bahan yang tidak boleh terkena air.",
+    image: "/service-washer-closeup.jpg",
+    imageAlt: "Handuk bersih di dalam mesin laundry",
+  },
+  {
+    icon: Truck,
+    title: "Antar Jemput",
+    desc: "Kami ambil dan antar ke rumah Anda tanpa biaya tambahan.",
+    image: "/service-laundry-team.jpg",
+    imageAlt: "Tim bekerja di fasilitas laundry",
+  },
+  {
+    icon: Timer,
+    title: "Express 1/2 Hari",
+    desc: "Pesanan rampung dalam satu sampai dua hari.",
+    image: "/service-washer-towels.jpg",
+    imageAlt: "Beberapa mesin laundry menangani handuk",
+  },
   {
     icon: ShieldCheck,
     title: "Garansi",
     desc: "Jaminan kepuasan atas hasil cucian.",
-    cell: "md:col-span-3",
+    image: "/hero-laundry-shop.jpg",
+    imageAlt: "Deretan mesin cuci di toko laundry",
     tint: true,
   },
 ] as const;
@@ -68,22 +95,33 @@ export function ServicesSection() {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.1 }}
-        className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3"
+        className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
       >
         {services.map((s) => (
           <motion.article
             key={s.title}
             variants={reduce ? {} : itemVariants}
             className={
-              "flex flex-col rounded-xl border border-border bg-card p-5 " +
-              (("tint" in s) ? "md:col-span-3 justify-center bg-primary/5 border-primary/20" : s.cell)
+              "group overflow-hidden rounded-xl border bg-card " +
+              (("tint" in s) ? "border-primary/20 bg-primary/5" : "border-border")
             }
           >
-            <span className={`grid size-9 place-items-center rounded-md ${("tint" in s) ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"}`}>
-              <s.icon size={17} strokeWidth={1.75} />
-            </span>
-            <h3 className="mt-3 text-lg font-semibold">{s.title}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
+            <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+              <Image
+                src={s.image}
+                alt={s.imageAlt}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            </div>
+            <div className="p-5">
+              <span className={`grid size-9 place-items-center rounded-md ${("tint" in s) ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"}`}>
+                <s.icon size={17} strokeWidth={1.75} />
+              </span>
+              <h3 className="mt-3 text-lg font-semibold">{s.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
+            </div>
           </motion.article>
         ))}
       </motion.div>

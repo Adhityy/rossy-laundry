@@ -422,7 +422,7 @@ export default function NewOrderPage() {
                 ? "Nomor pelanggan yang meneruskan cucian."
                 : status === "authenticated"
                   ? "Terisi otomatis dari profil, boleh diganti."
-                  : "Wajib diisi. Dengan nomor ini Anda bisa cek pesanan tanpa masuk akun."}
+                    : "Wajib diisi untuk menghubungi Anda terkait pesanan."}
             </p>
           </div>
         </CardContent>

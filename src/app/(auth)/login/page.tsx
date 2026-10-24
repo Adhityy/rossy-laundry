@@ -30,10 +30,13 @@ export default function LoginPage() {
       // Ambil data session untuk cek role
       const session = await getSession();
       
-      if ((session?.user as any)?.role === "ADMIN") {
-        router.push("/admin"); // Admin langsung ke Dashboard
+      const role = (session?.user as { role?: string } | undefined)?.role;
+      if (role === "ADMIN" || role === "OWNER") {
+        router.push("/admin");
       } else {
-        router.push("/"); // Customer ke halaman depan
+        const requestedPath = new URLSearchParams(window.location.search).get("callbackUrl");
+        const destination = requestedPath?.startsWith("/orders") ? requestedPath : "/";
+        router.push(destination);
       }
       // --------------------------
 
@@ -51,7 +54,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl tracking-tight">Masuk</CardTitle>
           <CardDescription>
-            Pakai akun pelanggan Anda untuk melihat dan membuat pesanan.
+            Masuk ke akun Anda untuk melanjutkan.
           </CardDescription>
         </CardHeader>
 

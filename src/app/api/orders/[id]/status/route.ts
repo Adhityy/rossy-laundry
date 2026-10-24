@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ORDER_STATUSES, STATUS_CANCELLED } from "@/lib/data";
+import { isStaffRole } from "@/lib/roles";
 import { z } from "zod";
 
 const ALLOWED = ORDER_STATUSES.map((s) => s.key) as readonly string[];
@@ -17,8 +18,9 @@ const schema = z.object({
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user || (session.user as any).role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (!session?.user || !isStaffRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
 
   try {

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isOwnerRole } from "@/lib/roles";
 
 export async function GET() {
   const session = await auth();
   const role = session?.user ? (session.user as { role?: string }).role : undefined;
-  if (!session?.user || role !== "ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session?.user || !isOwnerRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
   const orders = await prisma.order.findMany({ where: { status: "SELESAI" } });
   const expenses = await prisma.expense.findMany();

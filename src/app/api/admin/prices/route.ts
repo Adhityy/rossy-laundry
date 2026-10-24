@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/roles";
 import { z } from "zod";
 
 async function requireAdmin() {
   const session = await auth();
   const role = session?.user ? (session.user as { role?: string }).role : undefined;
-  if (!session?.user || role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user || !isStaffRole(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: session?.user ? 403 : 401 });
   }
   return null;
 }

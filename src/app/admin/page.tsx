@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, DollarSign, TrendingUp, Clock, FilePlus } from "lucide-react";
+import { Package, DollarSign, TrendingUp, Clock, FilePlus, CheckCircle2, ListOrdered } from "lucide-react";
 import { toast } from "sonner";
 import {
   Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUSES, STATUS_IN_PROGRESS, STATUS_CANCELLED } from "@/lib/data"; // Tambah STATUS_CANCELLED
@@ -26,6 +27,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
 
   const fetchOrders = () => {
     fetch("/api/orders/admin")
@@ -97,16 +102,31 @@ export default function AdminDashboard() {
     .reduce((sum, o) => sum + o.total, 0);
 
   const inProgress = orders.filter((o) => STATUS_IN_PROGRESS.includes(o.status as never));
+  const completedOrders = orders.filter((o) => o.status === SELESAI_KEY);
 
   const stats = [
     { icon: Package, label: "Pesanan hari ini", value: String(todayOrders.length) },
     { icon: DollarSign, label: "Pendapatan hari ini", value: formatCurrency(todayRevenue) },
     { icon: TrendingUp, label: "Total pendapatan", value: formatCurrency(totalRevenue) },
     { icon: Clock, label: "Sedang diproses", value: String(inProgress.length) },
+    { icon: CheckCircle2, label: "Pesanan selesai", value: String(completedOrders.length) },
+    { icon: ListOrdered, label: "Total semua pesanan", value: String(orders.length) },
   ];
 
   // --- FILTER DATA: Hanya tampilkan pesanan yang TIDAK dibatalkan di tabel ---
   const activeOrders = orders.filter((o) => o.status !== STATUS_CANCELLED);
+  const normalizedOrderSearch = orderSearch.trim().toLocaleLowerCase();
+  const normalizedCustomerSearch = customerSearch.trim().toLocaleLowerCase();
+  const filteredOrders = activeOrders.filter((order) => {
+    const customerName = (order.customerName || order.user?.name || "Tanpa nama").toLocaleLowerCase();
+
+    return (
+      order.orderNumber.toLocaleLowerCase().includes(normalizedOrderSearch) &&
+      customerName.includes(normalizedCustomerSearch) &&
+      (!orderStatusFilter || order.status === orderStatusFilter) &&
+      (!paymentStatusFilter || order.statusPembayaran === paymentStatusFilter)
+    );
+  });
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6">
@@ -122,9 +142,9 @@ export default function AdminDashboard() {
         </Button>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {loading
-          ? [0, 1, 2, 3].map((i) => (
+          ? [0, 1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <Skeleton className="h-8 w-8 sm:h-9 sm:w-9" />
                 <Skeleton className="mt-2 sm:mt-3 h-3 w-20 sm:w-28" />
@@ -153,12 +173,51 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
+              <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Input
+                  aria-label="Cari nomor order"
+                  placeholder="Cari No. order"
+                  value={orderSearch}
+                  onChange={(event) => setOrderSearch(event.target.value)}
+                />
+                <Input
+                  aria-label="Cari pelanggan"
+                  placeholder="Cari pelanggan"
+                  value={customerSearch}
+                  onChange={(event) => setCustomerSearch(event.target.value)}
+                />
+                <select
+                  aria-label="Filter status pesanan"
+                  value={orderStatusFilter}
+                  onChange={(event) => setOrderStatusFilter(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">Semua status pesanan</option>
+                  {ORDER_STATUSES.map((status) => (
+                    <option key={status.key} value={status.key}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Filter status pembayaran"
+                  value={paymentStatusFilter}
+                  onChange={(event) => setPaymentStatusFilter(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">Semua status pembayaran</option>
+                  <option value="BELUM_LUNAS">Belum Lunas</option>
+                  <option value="LUNAS">Lunas</option>
+                </select>
+              </div>
               <div className="md:hidden">
-                {activeOrders.length > 0 && (
-                  <p className="mb-3 text-sm text-muted-foreground px-4">Total {activeOrders.length} pesanan aktif.</p>
+                {filteredOrders.length > 0 && (
+                  <p className="mb-3 px-4 text-sm text-muted-foreground">
+                    Menampilkan {filteredOrders.length} dari {activeOrders.length} pesanan aktif.
+                  </p>
                 )}
                 <ul className="space-y-3 px-4">
-                  {activeOrders.map((o: any) => (
+                  {filteredOrders.map((o: any) => (
                     <li key={o.id} className="rounded-lg border border-border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <span className="tabular text-xs text-muted-foreground">{o.orderNumber}</span>
@@ -199,12 +258,21 @@ export default function AdminDashboard() {
                     </li>
                   ))}
                 </ul>
+                {filteredOrders.length === 0 && (
+                  <p className="px-4 pb-4 text-sm text-muted-foreground">
+                    {activeOrders.length === 0 ? "Belum ada pesanan aktif." : "Tidak ada pesanan yang cocok."}
+                  </p>
+                )}
               </div>
 
               <div className="hidden overflow-x-auto md:block">
                 <Table>
                   <TableCaption>
-                    {activeOrders.length === 0 ? "Belum ada pesanan aktif." : `Total ${activeOrders.length} pesanan aktif.`}
+                    {filteredOrders.length === 0
+                      ? activeOrders.length === 0
+                        ? "Belum ada pesanan aktif."
+                        : "Tidak ada pesanan yang cocok."
+                      : `Menampilkan ${filteredOrders.length} dari ${activeOrders.length} pesanan aktif.`}
                   </TableCaption>
                   <TableHeader>
                     <TableRow>
@@ -217,7 +285,7 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeOrders.map((o: any) => (
+                    {filteredOrders.map((o: any) => (
                       <TableRow key={o.id}>
                         <TableCell className="tabular pl-6 text-xs">{o.orderNumber}</TableCell>
                         <TableCell>

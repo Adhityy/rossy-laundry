@@ -18,7 +18,7 @@ model User {
   address   String?
   avatar    String? // data URL (serverless tidak bisa menulis file ke disk)
   password  String
-  role      String   @default("CUSTOMER") // CUSTOMER | ADMIN
+  role      String   @default("CUSTOMER") // CUSTOMER | ADMIN | OWNER
   createdAt DateTime @default(now())
   orders    Order[]
 }

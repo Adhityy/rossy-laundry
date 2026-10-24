@@ -3,30 +3,33 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/utils";
 import { z } from "zod";
+import { isStaffRole } from "@/lib/roles";
 
 const schema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().trim().min(3, "Tulis sedikit ulasan").max(500),
   /** Nama yang ditampilkan di beranda. Opsional - kalau kosong, diambil dari pesanan. */
   name: z.string().trim().max(40).optional(),
-  /** Dipakai penampil tamu: cocokkan dengan nomor WhatsApp pada pesanan. */
+  /** Cocokkan nomor WhatsApp dengan pesanan saat pengguna sudah masuk. */
   phone: z.string().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
 
 async function authorize(id: string, phoneHint?: string) {
+  const session = await auth();
+  if (!session?.user) return { kind: "unauthorized" as const };
+
   const order = await prisma.order.findUnique({
     where: { id },
     include: { review: true },
   });
   if (!order) return { kind: "not_found" as const };
 
-  const session = await auth();
-  const userId = session?.user ? (session.user as { id?: string }).id : undefined;
-  const role = session?.user ? (session.user as { role?: string }).role : undefined;
+  const userId = (session.user as { id?: string }).id;
+  const role = (session.user as { role?: string }).role;
 
-  if (role === "ADMIN") return { kind: "admin" as const, order };
+  if (isStaffRole(role)) return { kind: "admin" as const, order };
   if (userId && order.userId === userId) return { kind: "owner" as const, order };
 
   const hint = normalizePhone(phoneHint ?? "");
@@ -41,6 +44,9 @@ export async function GET(req: Request, { params }: Ctx) {
   const phone = new URL(req.url).searchParams.get("phone") ?? undefined;
   const res = await authorize(id, phone);
 
+  if (res.kind === "unauthorized") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (res.kind === "not_found") {
     return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   }
@@ -72,6 +78,9 @@ export async function POST(req: Request, { params }: Ctx) {
   const url = new URL(req.url);
   const res = await authorize(id, parsed.data.phone ?? url.searchParams.get("phone") ?? undefined);
 
+  if (res.kind === "unauthorized") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   if (res.kind === "not_found") {
     return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   }
